@@ -3,18 +3,153 @@
     {
       "Comercializadora": "Iberdrola",
       "Tipo": "Plan Online (Precio Fijo)",
-      "Precio_P_Punta": 0.119151,
-      "Precio_P_Valle": 0.078055,
-      "Precio_E_Fijo": 0.1499
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Fijo": 0
     },
     {
       "Comercializadora": "Iberdrola",
       "Tipo": "Plan Online 3 Periodos",
-      "Precio_P_Punta": 0.091074,
-      "Precio_P_Valle": 0.013483,
-      "Precio_E_Punta": 0.217,
-      "Precio_E_Llano": 0.162,
-      "Precio_E_Valle": 0.129
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Punta": 0,
+      "Precio_E_Llano": 0,
+      "Precio_E_Valle": 0
+    },
+    {
+      "Comercializadora": "EnergyaVM",
+      "Tipo": "Fórmula fija 24h luz",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Fijo": 0
+    },
+    {
+      "Comercializadora": "EnergyaVM",
+      "Tipo": "Fórmula fija 3 Periodos luz",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Punta": 0,
+      "Precio_E_Llano": 0,
+      "Precio_E_Valle": 0
+    },
+    {
+      "Comercializadora": "Visalia",
+      "Tipo": "Luz fijo 24h",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Fijo": 0
+    },
+    {
+      "Comercializadora": "Visalia",
+      "Tipo": "Luz 3 Periodos",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Punta": 0,
+      "Precio_E_Llano": 0,
+      "Precio_E_Valle": 0
+    },
+    {
+      "Comercializadora": "Octopus Energy",
+      "Tipo": "Octopus Relax",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Fijo": 0
+    },
+    {
+      "Comercializadora": "Octopus Energy",
+      "Tipo": "Octopus 3",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Punta": 0,
+      "Precio_E_Llano": 0,
+      "Precio_E_Valle": 0
+    },
+    {
+      "Comercializadora": "Nufri",
+      "Tipo": "Universal sin horarios",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Fijo": 0
+    },
+    {
+      "Comercializadora": "Nufri",
+      "Tipo": "Universal con horarios",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Punta": 0,
+      "Precio_E_Llano": 0,
+      "Precio_E_Valle": 0
+    },
+    {
+      "Comercializadora": "Imagina energía",
+      "Tipo": "Sin horas",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Fijo": 0
+    },
+    {
+      "Comercializadora": "Imagina energía",
+      "Tipo": "Noche y findes",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Punta": 0,
+      "Precio_E_Llano": 0,
+      "Precio_E_Valle": 0
+    },
+    {
+      "Comercializadora": "CHC Energía",
+      "Tipo": "Plan estrella duo",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Fijo": 0
+    },
+    {
+      "Comercializadora": "Naturgy",
+      "Tipo": "Por Uso Luz",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Fijo": 0
+    },
+    {
+      "Comercializadora": "Naturgy",
+      "Tipo": "Tarifa noche luz",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Punta": 0,
+      "Precio_E_Llano": 0,
+      "Precio_E_Valle": 0
+    },
+    {
+      "Comercializadora": "Endesa",
+      "Tipo": "Conecta Luz",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Fijo": 0
+    },
+    {
+      "Comercializadora": "Endesa",
+      "Tipo": "Conecta 3 Periodos",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Punta": 0,
+      "Precio_E_Llano": 0,
+      "Precio_E_Valle": 0
+    },
+    {
+      "Comercializadora": "Totalenergies",
+      "Tipo": "Luz Siempre",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Fijo": 0
+    },
+    {
+      "Comercializadora": "Totalenergies",
+      "Tipo": "Programa tu Ahorro",
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Punta": 0,
+      "Precio_E_Llano": 0,
+      "Precio_E_Valle": 0
     }
   ]
 }
