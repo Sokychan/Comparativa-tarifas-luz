@@ -40,10 +40,19 @@ def cargar_tarifas_json(ruta):
             {
                 "Comercializadora": "Iberdrola",
                 "Tipo": "Plan Online (Precio Fijo)",
-                "Precio_P_Punta": 0.1100,
-                "Precio_P_Valle": 0.0300,
-                "Precio_E_Fijo": 0.1420,
+                "Precio_P_Punta": 0.119151,
+                "Precio_P_Valle": 0.078055,
+                "Precio_E_Fijo": 0.1499,
             },
+            {
+                "Comercializadora": "Iberdrola",
+                "Tipo": "Plan Online 3 Periodos",
+                "Precio_P_Punta": 0.119151,
+                "Precio_P_Valle": 0.078055,
+                "Precio_E_Punta": 0.182000,
+                "Precio_E_Llano": 0.138000,
+                "Precio_E_Valle": 0.095000,
+            }
         ]
 
 tarifas_db = cargar_tarifas_json(ARCHIVO_JSON)
@@ -73,7 +82,6 @@ tarifas_fijas_db = [t for t in tarifas_db if "Precio_E_Fijo" in t]
 tarifas_horarias_db = [t for t in tarifas_db if "Precio_E_Fijo" not in t]
 
 # --- CONFIGURACIÓN DE DATOS DE CONSUMO EN EXPANDER DINÁMICO ---
-# El expander se muestra abierto por defecto y se oculta/contrae automáticamente tras pulsar calcular
 with st.expander("📊 Datos de consumo y modalidad de tarifa", expanded=not st.session_state.calculado):
     col_titulo, col_selector = st.columns([2, 1])
     with col_selector:
