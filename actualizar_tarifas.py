@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 # --- FUNCIONES DE OBTENCIÓN DE DATOS PARA CADA COMERCIALIZADORA ---
 
 def obtener_precios_iberdrola():
-    """Realiza web scraping en la web pública de Iberdrola para extraer los precios reales."""
+    """Extrae de forma precisa los precios de energía y potencia de la tabla de Iberdrola"""
     url = "https://www.iberdrola.com/luz/tarifa-online"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -21,18 +21,23 @@ def obtener_precios_iberdrola():
             soup = BeautifulSoup(response.text, 'html.parser')
             texto_completo = soup.get_text()
             
-            # Valores por defecto basados en la última visualización de su web
-            precio_e_fijo = 0.1499
-            precio_p_punta = 0.1191
+            # Valores por defecto de respaldo (basados en la captura actual)
+            precio_e_fijo = 0.1490
             precio_p_valle = 0.0780
+            precio_p_punta = 0.1191
             
-            # Búsqueda mediante expresiones regulares por si cambian las etiquetas HTML exactas
-            # Buscamos patrones numéricos cercanos a las unidades (€/kWh o €/kW día)
-            match_energia = re.search(r'([\d,\.]+)\s*€/kWh', texto_completo)
+            # 1. Extraer precio de energía (€/kWh)
+            match_energia = re.search(r'(\d+[,\.]\d+)\s*€/kWh', texto_completo)
             if match_energia:
                 precio_e_fijo = float(match_energia.group(1).replace(',', '.'))
+            
+            # 2. Extraer precios de potencia (€/kW día) en el orden en que aparecen en la web (Valle y Punta)
+            matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€/kW\s*d[ií]a', texto_completo)
+            if len(matches_potencia) >= 2:
+                precio_p_valle = float(matches_potencia[0].replace(',', '.'))
+                precio_p_punta = float(matches_potencia[1].replace(',', '.'))
                 
-            print(f"   [Scraping OK] Iberdrola extraída -> Energía: {precio_e_fijo} €/kWh")
+            print(f"   [Scraping OK] Iberdrola -> Energía: {precio_e_fijo}, Valle: {precio_p_valle}, Punta: {precio_p_punta}")
             
             return {
                 "Precio_P_Punta": precio_p_punta,
