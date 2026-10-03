@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 def obtener_precios_iberdrola():
     """Extrae los precios de energía y potencia de Iberdrola con protección frente a bloqueos de IP"""
-    url = "https://www.iberdrola.com/luz/tarifa-online"
+    url = "https://www.iberdrola.es/luz/tarifas/plan-online"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
