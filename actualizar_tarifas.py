@@ -93,13 +93,22 @@ def obtener_precios_iberdrola_3p():
             potencias_validas = [float(p.replace(',', '.')) for p in matches_potencia if 0.01 <= float(p.replace(',', '.')) <= 0.30]
             
             if len(precios_unicos) >= 3 and len(potencias_validas) >= 2:
-                print(f"   [Scraping OK] Iberdrola 3P -> E.Punta: {precios_unicos[0]}, E.Llano: {precios_unicos[1]}, E.Valle: {precios_unicos[2]} | P.Punta: {potencias_validas[1]}, P.Valle: {potencias_validas[0]}")
+                # Orden visual en web: Valle (0), Llano (1), Punta (2)
+                precio_e_valle = precios_unicos[0]
+                precio_e_llano = precios_unicos[1]
+                precio_e_punta = precios_unicos[2]
+                
+                # Orden visual potencia en web: Valle (0), Punta (1)
+                precio_p_valle = potencias_validas[0]
+                precio_p_punta = potencias_validas[1]
+
+                print(f"   [Scraping OK] Iberdrola 3P -> E.Punta: {precio_e_punta}, E.Llano: {precio_e_llano}, E.Valle: {precio_e_valle} | P.Punta: {precio_p_punta}, P.Valle: {precio_p_valle}")
                 return {
-                    "Precio_P_Punta": potencias_validas[1],
-                    "Precio_P_Valle": potencias_validas[0],
-                    "Precio_E_Punta": precios_unicos[0],
-                    "Precio_E_Llano": precios_unicos[1],
-                    "Precio_E_Valle": precios_unicos[2]
+                    "Precio_P_Punta": precio_p_punta,
+                    "Precio_P_Valle": precio_p_valle,
+                    "Precio_E_Punta": precio_e_punta,
+                    "Precio_E_Llano": precio_e_llano,
+                    "Precio_E_Valle": precio_e_valle
                 }
 
         print("⚠️ No se pudieron extraer los precios de Iberdrola 3P correctamente. Devolviendo 0...")
@@ -149,7 +158,7 @@ def actualizar_fichero_tarifas():
     ruta_json = "tarifas.json"
     
     if not os.path.exists(ruta_json):
-        print(f"⚠️ Error crítico: No se encuentra el fichero {ruta_json}")
+        print(f"⚠️️ Error crítico: No se encuentra el fichero {ruta_json}")
         return
 
     with open(ruta_json, "r", encoding="utf-8") as f:
