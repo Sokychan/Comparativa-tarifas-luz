@@ -195,6 +195,3 @@ if len(top_3) >= 3:
 st.markdown("---")
 st.subheader("📊 Comparativa Global de Todas las Tarifas")
 st.dataframe(df_resultados, use_container_width=True)
-
-# Gráfico de barras comparativo
-st.bar_chart(df_resultados.set_index("Comercializadora")["Total Estimado (€)"])
