@@ -13,8 +13,8 @@ st.set_page_config(
 
 st.title("⚡ Comparador Inteligente de Tarifas de Luz (España)")
 st.markdown("""
-Calcula y compara de forma automática qué comercializadora se adapta mejor a tu consumo real. 
-Introduce tus datos a continuación y pulsa el botón para calcular.
+Calcula y compara de forma automática qué comercializadora se adapta mejor al consumo real. 
+Introduce los datos a continuación y pulsa el botón para calcular.
 """)
 
 # --- CONFIGURACIÓN DE DATOS DE CONSUMO (FIJA, SIN EXPANDER) ---
@@ -62,8 +62,6 @@ st.info(f"Consumo total acumulado: **{total_kwh:.1f} kWh**")
 
 # Botón de confirmación para realizar la comparación
 calcular_pulsado = st.button("🚀 Calcular y Comparar Tarifas", type="primary")
-
-st.markdown("---")
 
 # --- CARGA DINÁMICA DE TARIFAS DESDE EL FICHERO .JSON ---
 ARCHIVO_JSON = "tarifas.json"
@@ -135,51 +133,9 @@ def formatear_precio(val):
     except (ValueError, TypeError):
         return str(val)
 
-# --- SEPARACIÓN Y VISUALIZACIÓN DE TABLAS DE PRECIOS UNITARIOS ---
+# Separar listas de tarifas fijas y horarias para uso interno
 tarifas_fijas_db = [t for t in tarifas_db if "Precio_E_Fijo" in t]
 tarifas_horarias_db = [t for t in tarifas_db if "Precio_E_Fijo" not in t]
-
-st.subheader("📋 Tarifas con Precio Fijo de Energía")
-if tarifas_fijas_db:
-    tabla_fijas_raw = []
-    for t in tarifas_fijas_db:
-        tipo_orig = t.get("Tipo", "")
-        if "(" in tipo_orig and ")" in tipo_orig:
-            tipo_mod = re.sub(r'\(.*?\)', '(Precio fijo 24h)', tipo_orig)
-        else:
-            tipo_mod = f"{tipo_orig} (Precio fijo 24h)"
-            
-        tabla_fijas_raw.append({
-            "Comercializadora": t.get("Comercializadora"),
-            "Tipo": tipo_mod,
-            "Potencia Punta (€/kW·día)": formatear_precio(t.get("Precio_P_Punta")),
-            "Potencia Valle (€/kW·día)": formatear_precio(t.get("Precio_P_Valle")),
-            "Energía Fija (€/kWh)": formatear_precio(t.get("Precio_E_Fijo")),
-        })
-    df_fijas = pd.DataFrame(tabla_fijas_raw)
-    st.dataframe(df_fijas, use_container_width=True, hide_index=True)
-else:
-    st.info("No hay tarifas con precio fijo de energía configuradas.")
-
-st.subheader("📋 Tarifas con Precio por Horas / Periodos de Energía")
-if tarifas_horarias_db:
-    tabla_horarias_raw = []
-    for t in tarifas_horarias_db:
-        tabla_horarias_raw.append({
-            "Comercializadora": t.get("Comercializadora"),
-            "Tipo": t.get("Tipo"),
-            "Potencia Punta (€/kW·día)": formatear_precio(t.get("Precio_P_Punta")),
-            "Potencia Valle (€/kW·día)": formatear_precio(t.get("Precio_P_Valle")),
-            "Energía Punta (€/kWh)": formatear_precio(t.get("Precio_E_Punta")),
-            "Energía Llano (€/kWh)": formatear_precio(t.get("Precio_E_Llano")),
-            "Energía Valle (€/kWh)": formatear_precio(t.get("Precio_E_Valle")),
-        })
-    df_horarias = pd.DataFrame(tabla_horarias_raw)
-    st.dataframe(df_horarias, use_container_width=True, hide_index=True)
-else:
-    st.info("No hay tarifas con precio por horas o periodos configuradas.")
-
-st.markdown("---")
 
 # --- MOTOR DE CÁLCULO Y RESULTADOS (CONTROLADO POR BOTÓN) ---
 if "calculado" not in st.session_state:
@@ -189,11 +145,50 @@ if calcular_pulsado:
     st.session_state.calculado = True
 
 if st.session_state.calculado:
-    # Filtrar tarifas según la modalidad de consumo elegida por el cliente
-    if modalidad_consumo == "Tarifa Fija":
-        tarifas_a_comparar = [t for t in tarifas_db if "Precio_E_Fijo" in t]
+    st.markdown("---")
+    
+    # 1. Mostrar la tabla del tipo de tarifa seleccionado
+    st.subheader(f"📋 Tarifas Evaluadas ({modalidad_consumo})")
+    if modalidad_consumo == "Tarifa Fija" and tarifas_fijas_db:
+        tabla_fijas_raw = []
+        for t in tarifas_fijas_db:
+            tipo_orig = t.get("Tipo", "")
+            if "(" in tipo_orig and ")" in tipo_orig:
+                tipo_mod = re.sub(r'\(.*?\)', '(Precio fijo 24h)', tipo_orig)
+            else:
+                tipo_mod = f"{tipo_orig} (Precio fijo 24h)"
+                
+            tabla_fijas_raw.append({
+                "Comercializadora": t.get("Comercializadora"),
+                "Tipo": tipo_mod,
+                "Potencia Punta (€/kW·día)": formatear_precio(t.get("Precio_P_Punta")),
+                "Potencia Valle (€/kW·día)": formatear_precio(t.get("Precio_P_Valle")),
+                "Energía Fija (€/kWh)": formatear_precio(t.get("Precio_E_Fijo")),
+            })
+        df_fijas = pd.DataFrame(tabla_fijas_raw)
+        st.dataframe(df_fijas, use_container_width=True, hide_index=True)
+    elif modalidad_consumo == "Tarifa por Periodos" and tarifas_horarias_db:
+        tabla_horarias_raw = []
+        for t in tarifas_horarias_db:
+            tabla_horarias_raw.append({
+                "Comercializadora": t.get("Comercializadora"),
+                "Tipo": t.get("Tipo"),
+                "Potencia Punta (€/kW·día)": formatear_precio(t.get("Precio_P_Punta")),
+                "Potencia Valle (€/kW·día)": formatear_precio(t.get("Precio_P_Valle")),
+                "Energía Punta (€/kWh)": formatear_precio(t.get("Precio_E_Punta")),
+                "Energía Llano (€/kWh)": formatear_precio(t.get("Precio_E_Llano")),
+                "Energía Valle (€/kWh)": formatear_precio(t.get("Precio_E_Valle")),
+            })
+        df_horarias = pd.DataFrame(tabla_horarias_raw)
+        st.dataframe(df_horarias, use_container_width=True, hide_index=True)
     else:
-        tarifas_a_comparar = [t for t in tarifas_db if "Precio_E_Fijo" not in t]
+        st.info("No hay tarifas configuradas para esta modalidad.")
+
+    # Filtrar tarifas según la modalidad de consumo elegida por el cliente para el cálculo
+    if modalidad_consumo == "Tarifa Fija":
+        tarifas_a_comparar = tarifas_fijas_db
+    else:
+        tarifas_a_comparar = tarifas_horarias_db
 
     resultados = []
     alquiler_contador = 0.81 * (dias / 30)  # Coste estimado alquiler de contador mensual
@@ -238,7 +233,8 @@ if st.session_state.calculado:
     if not df_resultados.empty:
         df_resultados = df_resultados.sort_values(by="Total Estimado (€)", ascending=True).reset_index(drop=True)
 
-        # --- VISUALIZACIÓN DE RESULTADOS ---
+        # 2. Mostrar el ranking de las 3 mejores opciones
+        st.markdown("---")
         st.header(f"🏆 Top Mejores Opciones ({modalidad_consumo})")
 
         col1, col2, col3 = st.columns(3)
@@ -269,6 +265,7 @@ if st.session_state.calculado:
                     delta_color="off"
                 )
 
+        # 3. Mostrar el resumen de precios de todas las comercializadoras comparadas
         st.markdown("---")
         st.subheader("📊 Comparativa Global de Costes Estimados")
         st.dataframe(df_resultados, use_container_width=True, hide_index=True)
