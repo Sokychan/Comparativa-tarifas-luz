@@ -19,9 +19,9 @@
     {
       "Comercializadora": "Iberdrola",
       "Tipo": "Plan Online (Precio Fijo)",
-      "Precio_P_Punta": 0.112,
-      "Precio_P_Valle": 0.031,
-      "Precio_E_Fijo": 0.145
+      "Precio_P_Punta": 0.119151,
+      "Precio_P_Valle": 0.078055,
+      "Precio_E_Fijo": 0.1499
     },
     {
       "Comercializadora": "Endesa",
