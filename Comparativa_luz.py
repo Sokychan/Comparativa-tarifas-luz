@@ -114,18 +114,35 @@ tarifas_db = cargar_tarifas_json(ARCHIVO_JSON)
 if not tarifas_db:
     st.stop()
 
-# --- TABLA DE PRECIOS DE LAS COMERCIALIZADORAS (3 DECIMALES) ---
+# --- CÁLCULO DINÁMICO DE DECIMALES MÁXIMOS ---
+max_decimales = 2
+for t in tarifas_db:
+    for k in ["Precio_P_Punta", "Precio_P_Valle", "Precio_E_Punta", "Precio_E_Llano", "Precio_E_Valle", "Precio_E_Fijo"]:
+        if k in t and isinstance(t[k], (int, float)):
+            partes = str(t[k]).split(".")
+            if len(partes) > 1:
+                max_decimales = max(max_decimales, len(partes[1]))
+
+def formatear_precio(val):
+    if val is None:
+        return "-"
+    try:
+        return f"{float(val):.{max_decimales}f}"
+    except (ValueError, TypeError):
+        return str(val)
+
+# --- TABLA DE PRECIOS DE LAS COMERCIALIZADORAS ---
 st.subheader("📋 Precios Unitarios de las Tarifas del Mercado")
 tabla_precios_raw = []
 for t in tarifas_db:
     tabla_precios_raw.append({
         "Comercializadora": t.get("Comercializadora"),
         "Tipo": t.get("Tipo"),
-        "Potencia Punta (€/kW·día)": f"{t.get('Precio_P_Punta', 0.0):.3f}",
-        "Potencia Valle (€/kW·día)": f"{t.get('Precio_P_Valle', 0.0):.3f}",
-        "Energía Punta (€/kWh)": f"{t.get('Precio_E_Punta', t.get('Precio_E_Fijo', 0.0)):.3f}",
-        "Energía Llano (€/kWh)": f"{t.get('Precio_E_Llano', t.get('Precio_E_Fijo', 0.0)):.3f}",
-        "Energía Valle (€/kWh)": f"{t.get('Precio_E_Valle', t.get('Precio_E_Fijo', 0.0)):.3f}",
+        "Potencia Punta (€/kW·día)": formatear_precio(t.get("Precio_P_Punta")),
+        "Potencia Valle (€/kW·día)": formatear_precio(t.get("Precio_P_Valle")),
+        "Energía Punta (€/kWh)": formatear_precio(t.get("Precio_E_Punta", t.get("Precio_E_Fijo"))),
+        "Energía Llano (€/kWh)": formatear_precio(t.get("Precio_E_Llano", t.get("Precio_E_Fijo"))),
+        "Energía Valle (€/kWh)": formatear_precio(t.get("Precio_E_Valle", t.get("Precio_E_Fijo"))),
     })
 df_precios_json = pd.DataFrame(tabla_precios_raw)
 st.dataframe(df_precios_json, use_container_width=True)
