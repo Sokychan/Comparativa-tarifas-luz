@@ -18,20 +18,47 @@ Introduce tus datos en el panel desplegable inferior para actualizar los resulta
 
 # --- PANEL DESPLEGABLE DE ENTRADA DE DATOS DE CONSUMO ---
 with st.expander("📝 Configuración de Datos de Consumo", expanded=True):
-    st.subheader("📊 Datos de consumo a comparar")
+    col_titulo, col_selector = st.columns([2, 1])
+    with col_titulo:
+        st.subheader("📊 Datos de consumo")
+    with col_selector:
+        modalidad_consumo = st.selectbox(
+            "Modalidad de tarifa",
+            ["Tarifa Fija", "Tarifa por Periodos"],
+            label_visibility="collapsed"
+        )
     
-    col1, col2 = st.columns(2)
-    with col1:
-        dias = st.number_input("Días del periodo de facturación", min_value=1, max_value=365, value=30, step=1)
-        potencia = st.number_input("Potencia contratada (kW)", min_value=1.0, max_value=15.0, value=4.6, step=0.1)
-    
-    with col2:
+    if modalidad_consumo == "Tarifa Fija":
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            dias = st.number_input("Días del periodo de facturación", min_value=1, max_value=365, value=30, step=1)
+        with col2:
+            potencia = st.number_input("Potencia contratada (kW)", min_value=1.0, max_value=15.0, value=4.6, step=0.1)
+        with col3:
+            total_kwh = st.number_input("Energía consumida (kWh)", min_value=0.0, value=300.0, step=1.0)
+        
+        # Distribución estimada estándar para la simulación en tarifas con periodos
+        kwh_punta = total_kwh * 0.25
+        kwh_llano = total_kwh * 0.30
+        kwh_valle = total_kwh * 0.45
+    else:
+        col1, col2 = st.columns(2)
+        with col1:
+            dias = st.number_input("Días del periodo de facturación", min_value=1, max_value=365, value=30, step=1)
+        with col2:
+            potencia = st.number_input("Potencia contratada (kW)", min_value=1.0, max_value=15.0, value=4.6, step=0.1)
+        
         st.markdown("**Consumo en kWh por Periodo**")
-        kwh_punta = st.number_input("kWh en Zona Punta", min_value=0.0, value=75.0, step=1.0)
-        kwh_llano = st.number_input("kWh en Zona Llano", min_value=0.0, value=90.0, step=1.0)
-        kwh_valle = st.number_input("kWh en Zona Valle", min_value=0.0, value=135.0, step=1.0)
+        col_p1, col_p2, col_p3 = st.columns(3)
+        with col_p1:
+            kwh_punta = st.number_input("kWh en Zona Punta", min_value=0.0, value=75.0, step=1.0)
+        with col_p2:
+            kwh_llano = st.number_input("kWh en Zona Llano", min_value=0.0, value=90.0, step=1.0)
+        with col_p3:
+            kwh_valle = st.number_input("kWh en Zona Valle", min_value=0.0, value=135.0, step=1.0)
+        
+        total_kwh = kwh_punta + kwh_llano + kwh_valle
     
-    total_kwh = kwh_punta + kwh_llano + kwh_valle
     st.info(f"Consumo total acumulado: **{total_kwh:.1f} kWh**")
 
 # --- CARGA DINÁMICA DE TARIFAS DESDE EL FICHERO .JSON ---
@@ -49,7 +76,6 @@ def cargar_tarifas_json(ruta):
             return []
     else:
         st.warning(f"⚠️ No se ha encontrado el archivo `{ruta}`. Se utilizará una estructura de ejemplo integrada.")
-        # Estructura por defecto si el archivo no existe todavía
         return [
             {
                 "Comercializadora": "PVPC (Regulado REE)",
@@ -88,18 +114,18 @@ tarifas_db = cargar_tarifas_json(ARCHIVO_JSON)
 if not tarifas_db:
     st.stop()
 
-# --- TABLA DE PRECIOS DE LAS COMERCIALIZADORAS (DESDE JSON) ---
-st.subheader("📋 Precios Unitarios de las Tarifas del Mercado (`tarifas.json`)")
+# --- TABLA DE PRECIOS DE LAS COMERCIALIZADORAS (3 DECIMALES) ---
+st.subheader("📋 Precios Unitarios de las Tarifas del Mercado")
 tabla_precios_raw = []
 for t in tarifas_db:
     tabla_precios_raw.append({
         "Comercializadora": t.get("Comercializadora"),
         "Tipo": t.get("Tipo"),
-        "Potencia Punta (€/kW·día)": t.get("Precio_P_Punta", "-"),
-        "Potencia Valle (€/kW·día)": t.get("Precio_P_Valle", "-"),
-        "Energía Punta (€/kWh)": t.get("Precio_E_Punta", t.get("Precio_E_Fijo", "-")),
-        "Energía Llano (€/kWh)": t.get("Precio_E_Llano", t.get("Precio_E_Fijo", "-")),
-        "Energía Valle (€/kWh)": t.get("Precio_E_Valle", t.get("Precio_E_Fijo", "-")),
+        "Potencia Punta (€/kW·día)": f"{t.get('Precio_P_Punta', 0.0):.3f}",
+        "Potencia Valle (€/kW·día)": f"{t.get('Precio_P_Valle', 0.0):.3f}",
+        "Energía Punta (€/kWh)": f"{t.get('Precio_E_Punta', t.get('Precio_E_Fijo', 0.0)):.3f}",
+        "Energía Llano (€/kWh)": f"{t.get('Precio_E_Llano', t.get('Precio_E_Fijo', 0.0)):.3f}",
+        "Energía Valle (€/kWh)": f"{t.get('Precio_E_Valle', t.get('Precio_E_Fijo', 0.0)):.3f}",
     })
 df_precios_json = pd.DataFrame(tabla_precios_raw)
 st.dataframe(df_precios_json, use_container_width=True)
