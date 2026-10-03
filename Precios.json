@@ -1,0 +1,23 @@
+{
+  "actualizado": "2026-10-03",
+  "planes": [
+    {
+      "id": "plan_online_fijo",
+      "tipo": "precio_fijo",
+      "nombre": "Plan Online",
+      "precio_kwh": 0.149,
+      "potencia_punta": 0.1191,
+      "potencia_valle": 0.0780
+    },
+    {
+      "id": "plan_online_3p",
+      "tipo": "tres_periodos",
+      "nombre": "Plan Online 3 Periodos",
+      "precio_punta": 0.217,
+      "precio_llano": 0.162,
+      "precio_valle": 0.129,
+      "potencia_punta": 0.0910,
+      "potencia_valle": 0.0134
+    }
+  ]
+}
