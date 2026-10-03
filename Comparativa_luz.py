@@ -40,18 +40,18 @@ def cargar_tarifas_json(ruta):
             {
                 "Comercializadora": "Iberdrola",
                 "Tipo": "Plan Online (Precio Fijo)",
-                "Precio_P_Punta": 0.119151,
-                "Precio_P_Valle": 0.078055,
-                "Precio_E_Fijo": 0.1499,
+                "Precio_P_Punta": 0,
+                "Precio_P_Valle": 0,
+                "Precio_E_Fijo": 0,
             },
             {
                 "Comercializadora": "Iberdrola",
                 "Tipo": "Plan Online 3 Periodos",
-                "Precio_P_Punta": 0.119151,
-                "Precio_P_Valle": 0.078055,
-                "Precio_E_Punta": 0.182000,
-                "Precio_E_Llano": 0.138000,
-                "Precio_E_Valle": 0.095000,
+                "Precio_P_Punta": 0,
+                "Precio_P_Valle": 0,
+                "Precio_E_Punta": 0,
+                "Precio_E_Llano": 0,
+                "Precio_E_Valle": 0,
             }
         ]
 
