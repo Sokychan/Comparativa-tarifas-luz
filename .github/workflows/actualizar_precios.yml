@@ -3,14 +3,14 @@ name: Actualizar Tarifas de Luz
 on:
   schedule:
     - cron: '0 8 * * *' # Se ejecuta todos los días a las 08:00 AM (UTC)
-  workflow_dispatch: # Permite que puedas lanzarlo manualmente desde la pestaña "Actions" de GitHub cuando quieras
+  workflow_dispatch: # Permite lanzarlo manualmente desde la pestaña "Actions"
 
 jobs:
   actualizar:
     runs-on: ubuntu-latest
     
     permissions:
-      contents: write # Permiso necesario para que GitHub Actions pueda hacer commit y push automático
+      contents: write # Permiso necesario para hacer commit y push automático
 
     steps:
       - name: Clonar repositorio
@@ -24,8 +24,7 @@ jobs:
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
-          # Si en el futuro usas librerías de scraping como requests o beautifulsoup4, ponlas aquí:
-          # pip install requests beautifulsoup4
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Ejecutar script de actualización de precios
         run: python actualizar_tarifas.py
