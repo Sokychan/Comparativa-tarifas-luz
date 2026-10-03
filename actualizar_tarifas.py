@@ -87,14 +87,6 @@ def actualizar_fichero_tarifas():
         nuevos_valores = None
         if "Iberdrola" in nombre:
             nuevos_valores = obtener_precios_iberdrola()
-        elif "Endesa" in nombre:
-            nuevos_valores = obtener_precios_endesa()
-        elif "Octopus" in nombre:
-            nuevos_valores = obtener_precios_octopus()
-        elif "Naturgy" in nombre:
-            nuevos_valores = obtener_precios_naturgy()
-        elif "PVPC" in nombre:
-            nuevos_valores = obtener_precios_pvpc()
         
         # Si hemos obtenido nuevos valores, actualizamos las claves dinámicamente
         if nuevos_valores:
