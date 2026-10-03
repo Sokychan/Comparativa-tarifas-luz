@@ -61,43 +61,6 @@ def obtener_precios_iberdrola():
             "Precio_E_Fijo": 0.149900
         }
 
-def obtener_precios_endesa():
-    """TODO: Realizar scraping en la web de Endesa"""
-    return {
-        "Precio_P_Punta": 0.1070,
-        "Precio_P_Valle": 0.0290,
-        "Precio_E_Fijo": 0.1400
-    }
-
-def obtener_precios_octopus():
-    """TODO: Realizar scraping en la web de Octopus Energy"""
-    return {
-        "Precio_P_Punta": 0.0920,
-        "Precio_P_Valle": 0.0260,
-        "Precio_E_Fijo": 0.1320
-    }
-
-def obtener_precios_naturgy():
-    """TODO: Realizar scraping en la web de Naturgy"""
-    return {
-        "Precio_P_Punta": 0.0960,
-        "Precio_P_Valle": 0.0230,
-        "Precio_E_Punta": 0.1720,
-        "Precio_E_Llano": 0.1420,
-        "Precio_E_Valle": 0.1020
-    }
-
-def obtener_precios_pvpc():
-    """El PVPC se puede consultar directamente mediante la API oficial de ESIOS / REE"""
-    return {
-        "Precio_P_Punta": 0.0820,
-        "Precio_P_Valle": 0.0210,
-        "Precio_E_Punta": 0.1650,
-        "Precio_E_Llano": 0.1320,
-        "Precio_E_Valle": 0.0910
-    }
-
-
 def actualizar_fichero_tarifas():
     ruta_json = "tarifas.json"
     
