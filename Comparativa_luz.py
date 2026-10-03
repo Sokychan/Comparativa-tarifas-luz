@@ -12,45 +12,27 @@ st.set_page_config(
 
 st.title("⚡ Comparador Inteligente de Tarifas de Luz (España)")
 st.markdown("""
-Calcula y compara de forma automática qué comercializadora se adapta mejor a tu estilo de vida y consumo real. 
-Introduce tus datos y los de tu tarifa actual en el panel desplegable inferior para ver los resultados actualizados.
+Calcula y compara de forma automática qué comercializadora se adapta mejor a tu consumo real. 
+Introduce tus datos en el panel desplegable inferior para actualizar los resultados.
 """)
 
-# --- PANEL DESPLEGABLE DE ENTRADA DE DATOS ---
-with st.expander("📝 Configuración de Datos de Consumo y Comercializadora Actual", expanded=True):
-    col_consumo, col_actual = st.columns(2)
+# --- PANEL DESPLEGABLE DE ENTRADA DE DATOS DE CONSUMO ---
+with st.expander("📝 Configuración de Datos de Consumo", expanded=True):
+    st.subheader("📊 Datos de consumo a comparar")
     
-    with col_consumo:
-        st.subheader("📊 Datos de consumo a comparar")
+    col1, col2 = st.columns(2)
+    with col1:
         dias = st.number_input("Días del periodo de facturación", min_value=1, max_value=365, value=30, step=1)
         potencia = st.number_input("Potencia contratada (kW)", min_value=1.0, max_value=15.0, value=4.6, step=0.1)
-        
+    
+    with col2:
         st.markdown("**Consumo en kWh por Periodo**")
         kwh_punta = st.number_input("kWh en Zona Punta", min_value=0.0, value=75.0, step=1.0)
         kwh_llano = st.number_input("kWh en Zona Llano", min_value=0.0, value=90.0, step=1.0)
         kwh_valle = st.number_input("kWh en Zona Valle", min_value=0.0, value=135.0, step=1.0)
-        
-        total_kwh = kwh_punta + kwh_llano + kwh_valle
-        st.info(f"Consumo total acumulado: **{total_kwh:.1f} kWh**")
-
-    with col_actual:
-        st.subheader("💡 Datos de comercializadora actual")
-        nombre_actual = st.text_input("Nombre de la comercializadora", value="Mi Comercializadora Actual")
-        precio_p1_actual = st.number_input("Precio potencia P1 (€/kW·día)", min_value=0.0, value=0.0900, format="%.4f")
-        precio_p2_actual = st.number_input("Precio potencia P2 (€/kW·día)", min_value=0.0, value=0.0250, format="%.4f")
-        
-        st.markdown("**Coste kWh**")
-        tipo_precio_actual = st.selectbox(
-            "Selecciona la modalidad de precio de tu tarifa",
-            ["Precio Fijo", "Precio por Horas (3 Periodos)"]
-        )
-        
-        if tipo_precio_actual == "Precio Fijo":
-            precio_e_fijo_actual = st.number_input("Importe kWh fijo (€/kWh)", min_value=0.0, value=0.1300, format="%.4f")
-        else:
-            precio_e_punta_actual = st.number_input("Coste kWh Zona Punta (€/kWh)", min_value=0.0, value=0.1650, format="%.4f")
-            precio_e_llano_actual = st.number_input("Coste kWh Zona Llano (€/kWh)", min_value=0.0, value=0.1320, format="%.4f")
-            precio_e_valle_actual = st.number_input("Coste kWh Zona Valle (€/kWh)", min_value=0.0, value=0.0910, format="%.4f")
+    
+    total_kwh = kwh_punta + kwh_llano + kwh_valle
+    st.info(f"Consumo total acumulado: **{total_kwh:.1f} kWh**")
 
 # --- CARGA DINÁMICA DE TARIFAS DESDE EL FICHERO .JSON ---
 ARCHIVO_JSON = "tarifas.json"
@@ -66,54 +48,83 @@ def cargar_tarifas_json(ruta):
             st.error(f"Error al leer el archivo JSON de tarifas: {e}")
             return []
     else:
-        st.warning(f"⚠️ No se ha encontrado el archivo `{ruta}`. Asegúrate de incluirlo en tu repositorio o generarlo mediante scraping.")
-        return []
+        st.warning(f"⚠️ No se ha encontrado el archivo `{ruta}`. Se utilizará una estructura de ejemplo integrada.")
+        # Estructura por defecto si el archivo no existe todavía
+        return [
+            {
+                "Comercializadora": "PVPC (Regulado REE)",
+                "Tipo": "Discriminación Horaria (3 periodos)",
+                "Precio_P_Punta": 0.0820,
+                "Precio_P_Valle": 0.0210,
+                "Precio_E_Punta": 0.1650,
+                "Precio_E_Llano": 0.1320,
+                "Precio_E_Valle": 0.0910,
+            },
+            {
+                "Comercializadora": "Octopus Energy",
+                "Tipo": "Precio Fijo (24h)",
+                "Precio_P_Punta": 0.0900,
+                "Precio_P_Valle": 0.0250,
+                "Precio_E_Fijo": 0.1300,
+            },
+            {
+                "Comercializadora": "Iberdrola",
+                "Tipo": "Plan Online (Precio Fijo)",
+                "Precio_P_Punta": 0.1100,
+                "Precio_P_Valle": 0.0300,
+                "Precio_E_Fijo": 0.1420,
+            },
+            {
+                "Comercializadora": "Endesa",
+                "Tipo": "One Luz (Precio Fijo)",
+                "Precio_P_Punta": 0.1050,
+                "Precio_P_Valle": 0.0280,
+                "Precio_E_Fijo": 0.1380,
+            }
+        ]
 
 tarifas_db = cargar_tarifas_json(ARCHIVO_JSON)
 
-# Si la base de datos está vacía, detenemos la ejecución para evitar que falle el script
 if not tarifas_db:
     st.stop()
 
-# --- AÑADIR LA TARIFA ACTUAL DEL USUARIO A LA COMPARATIVA ---
-if tipo_precio_actual == "Precio Fijo":
-    tarifa_actual_usuario = {
-        "Comercializadora": f"📍 {nombre_actual} (Actual)",
-        "Tipo": "Precio Fijo (Tu tarifa)",
-        "Precio_P_Punta": precio_p1_actual,
-        "Precio_P_Valle": precio_p2_actual,
-        "Precio_E_Fijo": precio_e_fijo_actual,
-    }
-else:
-    tarifa_actual_usuario = {
-        "Comercializadora": f"📍 {nombre_actual} (Actual)",
-        "Tipo": "Discriminación Horaria (Tu tarifa)",
-        "Precio_P_Punta": precio_p1_actual,
-        "Precio_P_Valle": precio_p2_actual,
-        "Precio_E_Punta": precio_e_punta_actual,
-        "Precio_E_Llano": precio_e_llano_actual,
-        "Precio_E_Valle": precio_e_valle_actual,
-    }
+# --- TABLA DE PRECIOS DE LAS COMERCIALIZADORAS (DESDE JSON) ---
+st.subheader("📋 Precios Unitarios de las Tarifas del Mercado (`tarifas.json`)")
+tabla_precios_raw = []
+for t in tarifas_db:
+    tabla_precios_raw.append({
+        "Comercializadora": t.get("Comercializadora"),
+        "Tipo": t.get("Tipo"),
+        "Potencia Punta (€/kW·día)": t.get("Precio_P_Punta", "-"),
+        "Potencia Valle (€/kW·día)": t.get("Precio_P_Valle", "-"),
+        "Energía Punta (€/kWh)": t.get("Precio_E_Punta", t.get("Precio_E_Fijo", "-")),
+        "Energía Llano (€/kWh)": t.get("Precio_E_Llano", t.get("Precio_E_Fijo", "-")),
+        "Energía Valle (€/kWh)": t.get("Precio_E_Valle", t.get("Precio_E_Fijo", "-")),
+    })
+df_precios_json = pd.DataFrame(tabla_precios_raw)
+st.dataframe(df_precios_json, use_container_width=True)
 
-# Insertamos la tarifa del usuario al inicio de la lista
-tarifas_db.insert(0, tarifa_actual_usuario)
+st.markdown("---")
 
 # --- MOTOR DE CÁLCULO ---
 resultados = []
 alquiler_contador = 0.81 * (dias / 30)  # Coste estimado alquiler de contador mensual
 
 for t in tarifas_db:
+    p_punta = t.get("Precio_P_Punta", 0.0)
+    p_valle = t.get("Precio_P_Valle", 0.0)
+    
     # Coste de potencia (repartido simétricamente entre P1 y P2 para la simulación)
-    coste_potencia = potencia * (t["Precio_P_Punta"] + t["Precio_P_Valle"]) * (dias / 2)
+    coste_potencia = potencia * (p_punta + p_valle) * (dias / 2)
     
     # Coste de energía según si es precio fijo o discriminación horaria
     if "Precio_E_Fijo" in t:
         coste_energia = total_kwh * t["Precio_E_Fijo"]
     else:
         coste_energia = (
-            (kwh_punta * t["Precio_E_Punta"]) + 
-            (kwh_llano * t["Precio_E_Llano"]) + 
-            (kwh_valle * t["Precio_E_Valle"])
+            (kwh_punta * t.get("Precio_E_Punta", 0.0)) + 
+            (kwh_llano * t.get("Precio_E_Llano", 0.0)) + 
+            (kwh_valle * t.get("Precio_E_Valle", 0.0))
         )
     
     # Subtotal antes de impuestos
@@ -125,8 +136,8 @@ for t in tarifas_db:
     total_factura = base_imponible * 1.21
     
     resultados.append({
-        "Comercializadora": t["Comercializadora"],
-        "Tipo": t["Tipo"],
+        "Comercializadora": t.get("Comercializadora"),
+        "Tipo": t.get("Tipo"),
         "Coste Potencia (€)": round(coste_potencia, 2),
         "Coste Energía (€)": round(coste_energia, 2),
         "Total Estimado (€)": round(total_factura, 2)
@@ -168,5 +179,5 @@ if len(top_3) >= 3:
         )
 
 st.markdown("---")
-st.subheader("📊 Comparativa Global de Todas las Tarifas")
+st.subheader("📊 Comparativa Global de Costes Estimados")
 st.dataframe(df_resultados, use_container_width=True)
