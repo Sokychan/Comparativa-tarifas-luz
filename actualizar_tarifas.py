@@ -16,51 +16,41 @@ def obtener_precios_iberdrola_fijo():
         "Cache-Control": "no-cache"
     }
     
+    error_return = {
+        "Precio_P_Punta": 0,
+        "Precio_P_Valle": 0,
+        "Precio_E_Fijo": 0
+    }
+    
     try:
         response = requests.get(url, headers=headers, timeout=15)
         
         if response.status_code == 200 and "kWh" in response.text:
             soup = BeautifulSoup(response.text, 'html.parser')
-            texto_completo = soup.get_text()
+            texto_limpio = ' '.join(soup.get_text(separator=' ').split())
             
-            precio_e_fijo = None
-            precio_p_valle = None
-            precio_p_punta = None
+            match_energia = re.search(r'(\d+[,\.]\d+)\s*€\s*/\s*kWh', texto_limpio, re.IGNORECASE)
+            matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kW\s*(?:d[ií]a|día)', texto_limpio, re.IGNORECASE)
+            potencias_validas = [float(p.replace(',', '.')) for p in matches_potencia if 0.01 <= float(p.replace(',', '.')) <= 0.30]
             
-            match_energia = re.search(r'(\d+[,\.]\d+)\s*€\s*/\s*kWh', texto_completo, re.IGNORECASE)
-            if match_energia:
+            if match_energia and len(potencias_validas) >= 2:
                 precio_e_fijo = float(match_energia.group(1).replace(',', '.'))
-            
-            matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kW\s*d[ií]a', texto_completo, re.IGNORECASE)
-            if len(matches_potencia) >= 2:
-                precio_p_valle = float(matches_potencia[0].replace(',', '.'))
-                precio_p_punta = float(matches_potencia[1].replace(',', '.'))
-            
-            if precio_e_fijo and precio_p_valle and precio_p_punta:
-                print(f"   [Scraping OK] Iberdrola Fijo -> Energía: {precio_e_fijo}, Valle: {precio_p_valle}, Punta: {precio_p_punta}")
+                print(f"   [Scraping OK] Iberdrola Fijo -> Energía: {precio_e_fijo}, Valle: {potencias_validas[0]}, Punta: {potencias_validas[1]}")
                 return {
-                    "Precio_P_Punta": precio_p_punta,
-                    "Precio_P_Valle": precio_p_valle,
+                    "Precio_P_Punta": potencias_validas[1],
+                    "Precio_P_Valle": potencias_validas[0],
                     "Precio_E_Fijo": precio_e_fijo
                 }
 
-        print("⚠️ Respuesta restringida en la nube. Aplicando valores verificados (Iberdrola Fijo)...")
-        return {
-            "Precio_P_Punta": 0,
-            "Precio_P_Valle": 0,
-            "Precio_E_Fijo": 0
-        }
+        print("⚠️ Error o restricción en Iberdrola Fijo. Devolviendo 0...")
+        return error_return
             
     except Exception as e:
-        print(f"⚠️ Excepción durante el scraping de Iberdrola Fijo: {e}")
-        return {
-            "Precio_P_Punta": 0,
-            "Precio_P_Valle": 0,
-            "Precio_E_Fijo": 0
-        }
+        print(f"⚠️ Excepción en Iberdrola Fijo: {e}. Devolviendo 0...")
+        return error_return
 
 def obtener_precios_iberdrola_3p():
-    """Extrae los precios del Plan Online 3 Periodos de Iberdrola de forma contextual"""
+    """Extrae los precios del Plan Online 3 Periodos de Iberdrola"""
     url = "https://www.iberdrola.es/luz/tarifas/plan-online-tres-periodos"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -69,82 +59,55 @@ def obtener_precios_iberdrola_3p():
         "Cache-Control": "no-cache"
     }
     
+    error_return = {
+        "Precio_P_Punta": 0,
+        "Precio_P_Valle": 0,
+        "Precio_E_Punta": 0,
+        "Precio_E_Llano": 0,
+        "Precio_E_Valle": 0
+    }
+    
     try:
         response = requests.get(url, headers=headers, timeout=15)
         
-        if response.status_code == 200 and ("kWh" in response.text or "periodos" in response.text.lower()):
+        if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Limpiamos bloques de scripts/estilos innecesarios para trabajar con texto limpio
-            for element in soup(["script", "style", "header", "footer"]):
+            for element in soup(["script", "style", "header", "footer", "nav"]):
                 element.extract()
                 
-            texto_completo = soup.get_text(separator=' ')
+            texto_limpio = ' '.join(soup.get_text(separator=' ').split())
             
-            precio_e_punta = None
-            precio_e_llano = None
-            precio_e_valle = None
-            precio_p_punta = None
-            precio_p_valle = None
+            # Extracción y filtrado de precios de energía en rangos lógicos de mercado (0.03€ a 0.60€)
+            matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kWh', texto_limpio, re.IGNORECASE)
+            precios_energia = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
             
-            # 1. Extracción contextual por palabras clave de periodos (Punta, Llano, Valle)
-            match_punta = re.search(r'(?:Punta|P1).*?(\d+[,\.]\d+)\s*€\s*/\s*kWh', texto_completo, re.IGNORECASE | re.DOTALL)
-            match_llano = re.search(r'(?:Llano|P2).*?(\d+[,\.]\d+)\s*€\s*/\s*kWh', texto_completo, re.IGNORECASE | re.DOTALL)
-            match_valle = re.search(r'(?:Valle|P3).*?(\d+[,\.]\d+)\s*€\s*/\s*kWh', texto_completo, re.IGNORECASE | re.DOTALL)
+            # Filtrar duplicados consecutivos (común en maquetaciones web responsive)
+            precios_unicos = []
+            for p in precios_energia:
+                if not precios_unicos or precios_unicos[-1] != p:
+                    precios_unicos.append(p)
             
-            if match_punta:
-                precio_e_punta = float(match_punta.group(1).replace(',', '.'))
-            if match_llano:
-                precio_e_llano = float(match_llano.group(1).replace(',', '.'))
-            if match_valle:
-                precio_e_valle = float(match_valle.group(1).replace(',', '.'))
-                
-            # 2. Respaldo por secuencia si la búsqueda por palabra clave no encuentra los tres tramos
-            if not (precio_e_punta and precio_e_llano and precio_e_valle):
-                matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kWh', texto_completo, re.IGNORECASE)
-                if len(matches_energia) >= 3:
-                    precio_e_punta = precio_e_punta or float(matches_energia[0].replace(',', '.'))
-                    precio_e_llano = precio_e_llano or float(matches_energia[1].replace(',', '.'))
-                    precio_e_valle = precio_e_valle or float(matches_energia[2].replace(',', '.'))
+            # Extracción y filtrado de precios de potencia (€/kW día)
+            matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kW\s*(?:d[ií]a|día)', texto_limpio, re.IGNORECASE)
+            potencias_validas = [float(p.replace(',', '.')) for p in matches_potencia if 0.01 <= float(p.replace(',', '.')) <= 0.30]
             
-            # Extracción de potencias
-            matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kW\s*d[ií]a', texto_completo, re.IGNORECASE)
-            if len(matches_potencia) >= 2:
-                precio_p_punta = float(matches_potencia[0].replace(',', '.'))
-                precio_p_valle = float(matches_potencia[1].replace(',', '.'))
-            else:
-                # Valores base de potencia por defecto si no están visibles en el cuerpo de la página
-                precio_p_punta = 0.119151
-                precio_p_valle = 0.078055
-
-            if precio_e_punta and precio_e_llano and precio_e_valle:
-                print(f"   [Scraping OK] Iberdrola 3P -> E.Punta: {precio_e_punta}, E.Llano: {precio_e_llano}, E.Valle: {precio_e_valle} | P.Punta: {precio_p_punta}, P.Valle: {precio_p_valle}")
+            if len(precios_unicos) >= 3 and len(potencias_validas) >= 2:
+                print(f"   [Scraping OK] Iberdrola 3P -> E.Punta: {precios_unicos[0]}, E.Llano: {precios_unicos[1]}, E.Valle: {precios_unicos[2]} | P.Punta: {potencias_validas[1]}, P.Valle: {potencias_validas[0]}")
                 return {
-                    "Precio_P_Punta": precio_p_punta,
-                    "Precio_P_Valle": precio_p_valle,
-                    "Precio_E_Punta": precio_e_punta,
-                    "Precio_E_Llano": precio_e_llano,
-                    "Precio_E_Valle": precio_e_valle
+                    "Precio_P_Punta": potencias_validas[1],
+                    "Precio_P_Valle": potencias_validas[0],
+                    "Precio_E_Punta": precios_unicos[0],
+                    "Precio_E_Llano": precios_unicos[1],
+                    "Precio_E_Valle": precios_unicos[2]
                 }
 
-        print("⚠️ Respuesta restringida en la nube o cambio en la maquetación HTML. Aplicando valores verificados (Iberdrola 3P)...")
-        return {
-            "Precio_P_Punta": 0,
-            "Precio_P_Valle": 0,
-            "Precio_E_Punta": 0,
-            "Precio_E_Llano": 0,
-            "Precio_E_Valle": 0
-        }
+        print("⚠️ No se pudieron extraer los precios de Iberdrola 3P correctamente. Devolviendo 0...")
+        return error_return
             
     except Exception as e:
-        print(f"⚠️ Excepción durante el scraping de Iberdrola 3P: {e}")
-        return {
-            "Precio_P_Punta": 0,
-            "Precio_P_Valle": 0,
-            "Precio_E_Punta": 0,
-            "Precio_E_Llano": 0,
-            "Precio_E_Valle": 0
-        }
+        print(f"⚠️ Excepción en Iberdrola 3P: {e}. Devolviendo 0...")
+        return error_return
 
 def obtener_precios_endesa():
     """TODO: Realizar scraping en la web de Endesa"""
@@ -189,18 +152,15 @@ def actualizar_fichero_tarifas():
         print(f"⚠️ Error crítico: No se encuentra el fichero {ruta_json}")
         return
 
-    # 1. Cargamos el fichero JSON actual
     with open(ruta_json, "r", encoding="utf-8") as f:
         datos = json.load(f)
 
     print("🔄 Iniciando proceso de actualización de tarifas de mercado...")
 
-    # 2. Recorremos dinámicamente cada tarifa registrada en el JSON
     for tarifa in datos.get("tarifas", []):
         nombre = tarifa.get("Comercializadora", "")
         tipo = tarifa.get("Tipo", "")
         
-        # Ignoramos si es la tarifa personalizada del usuario
         if "(Actual)" in nombre or "Tu tarifa" in tipo:
             continue
 
@@ -221,15 +181,13 @@ def actualizar_fichero_tarifas():
         elif "PVPC" in nombre:
             nuevos_valores = obtener_precios_pvpc()
         
-        # Si hemos obtenido nuevos valores, actualizamos las claves dinámicamente
         if nuevos_valores:
             for clave, valor in nuevos_valores.items():
                 tarifa[clave] = valor
-            print(f"   ✔ {nombre} ({tipo}) actualizada con éxito.")
+            print(f"   ✔ {nombre} ({tipo}) procesada.")
         else:
-            print(f"   ⚠ No hay rutina de actualización definida para {nombre}.")
+            print(f"   ⚠ No hay rutina definida para {nombre}.")
 
-    # 3. Guardamos los cambios de vuelta en el fichero tarifas.json
     with open(ruta_json, "w", encoding="utf-8") as f:
         json.dump(datos, f, ensure_ascii=False, indent=2)
 
