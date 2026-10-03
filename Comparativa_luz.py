@@ -128,7 +128,7 @@ if len(top_3) >= 1:
     with col1:
         st.metric(
             label=f"🥇 1º - {top_3.loc[0, 'Comercializadora']}",
-            value=f"{top_3.loc[0, 'Total Estimado (€)]']} €",
+            value=f"{top_3.loc[0, 'Total Estimado (€)']} €",
             delta=top_3.loc[0, 'Tipo'],
             delta_color="off"
         )
@@ -136,7 +136,7 @@ if len(top_3) >= 2:
     with col2:
         st.metric(
             label=f"🥈 2º - {top_3.loc[1, 'Comercializadora']}",
-            value=f"{top_3.loc[1, 'Total Estimado (€)]']} €",
+            value=f"{top_3.loc[1, 'Total Estimado (€)']} €",
             delta=top_3.loc[1, 'Tipo'],
             delta_color="off"
         )
@@ -144,7 +144,7 @@ if len(top_3) >= 3:
     with col3:
         st.metric(
             label=f"🥉 3º - {top_3.loc[2, 'Comercializadora']}",
-            value=f"{top_3.loc[2, 'Total Estimado (€)]']} €",
+            value=f"{top_3.loc[2, 'Total Estimado (€)']} €",
             delta=top_3.loc[2, 'Tipo'],
             delta_color="off"
         )
