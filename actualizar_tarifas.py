@@ -46,17 +46,17 @@ def obtener_precios_iberdrola_fijo():
 
         print("⚠️ Respuesta restringida en la nube. Aplicando valores verificados (Iberdrola Fijo)...")
         return {
-            "Precio_P_Punta": 0.119151,
-            "Precio_P_Valle": 0.078055,
-            "Precio_E_Fijo": 0.149900
+            "Precio_P_Punta": 0,
+            "Precio_P_Valle": 0,
+            "Precio_E_Fijo": 0
         }
             
     except Exception as e:
         print(f"⚠️ Excepción durante el scraping de Iberdrola Fijo: {e}")
         return {
-            "Precio_P_Punta": 0.119151,
-            "Precio_P_Valle": 0.078055,
-            "Precio_E_Fijo": 0.149900
+            "Precio_P_Punta": 0,
+            "Precio_P_Valle": 0,
+            "Precio_E_Fijo": 0
         }
 
 def obtener_precios_iberdrola_3p():
@@ -129,21 +129,21 @@ def obtener_precios_iberdrola_3p():
 
         print("⚠️ Respuesta restringida en la nube o cambio en la maquetación HTML. Aplicando valores verificados (Iberdrola 3P)...")
         return {
-            "Precio_P_Punta": 0.119151,
-            "Precio_P_Valle": 0.078055,
-            "Precio_E_Punta": 0.182000,
-            "Precio_E_Llano": 0.138000,
-            "Precio_E_Valle": 0.095000
+            "Precio_P_Punta": 0,
+            "Precio_P_Valle": 0,
+            "Precio_E_Punta": 0,
+            "Precio_E_Llano": 0,
+            "Precio_E_Valle": 0
         }
             
     except Exception as e:
         print(f"⚠️ Excepción durante el scraping de Iberdrola 3P: {e}")
         return {
-            "Precio_P_Punta": 0.119151,
-            "Precio_P_Valle": 0.078055,
-            "Precio_E_Punta": 0.182000,
-            "Precio_E_Llano": 0.138000,
-            "Precio_E_Valle": 0.095000
+            "Precio_P_Punta": 0,
+            "Precio_P_Valle": 0,
+            "Precio_E_Punta": 0,
+            "Precio_E_Llano": 0,
+            "Precio_E_Valle": 0
         }
 
 def obtener_precios_endesa():
