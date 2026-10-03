@@ -1,34 +1,11 @@
 {
   "tarifas": [
     {
-      "Comercializadora": "PVPC (Regulado REE)",
-      "Tipo": "Discriminación Horaria (3 periodos)",
-      "Precio_P_Punta": 0.082,
-      "Precio_P_Valle": 0.021,
-      "Precio_E_Punta": 0.165,
-      "Precio_E_Llano": 0.132,
-      "Precio_E_Valle": 0.091
-    },
-    {
-      "Comercializadora": "Octopus Energy",
-      "Tipo": "Precio Fijo (24h)",
-      "Precio_P_Punta": 0.092,
-      "Precio_P_Valle": 0.026,
-      "Precio_E_Fijo": 0.132
-    },
-    {
       "Comercializadora": "Iberdrola",
       "Tipo": "Plan Online (Precio Fijo)",
       "Precio_P_Punta": 0.119151,
       "Precio_P_Valle": 0.078055,
       "Precio_E_Fijo": 0.1499
-    },
-    {
-      "Comercializadora": "Endesa",
-      "Tipo": "One Luz (Precio Fijo)",
-      "Precio_P_Punta": 0.107,
-      "Precio_P_Valle": 0.029,
-      "Precio_E_Fijo": 0.14
     }
   ]
 }
