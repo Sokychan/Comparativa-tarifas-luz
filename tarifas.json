@@ -10,11 +10,11 @@
     {
       "Comercializadora": "Iberdrola",
       "Tipo": "Plan Online 3 Periodos",
-      "Precio_P_Punta": 0.119151,
+      "Precio_P_Punta": 0.091074,
       "Precio_P_Valle": 0.013483,
-      "Precio_E_Punta": 0.162,
-      "Precio_E_Llano": 0.129,
-      "Precio_E_Valle": 0.03
+      "Precio_E_Punta": 0.217,
+      "Precio_E_Llano": 0.162,
+      "Precio_E_Valle": 0.129
     }
   ]
 }
