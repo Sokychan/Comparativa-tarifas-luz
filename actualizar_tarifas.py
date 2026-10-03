@@ -204,7 +204,7 @@ def actualizar_fichero_tarifas():
                 tarifa[clave] = valor
             print(f"   ✔ {nombre} ({tipo}) actualizada con éxito.")
         else:
-            print(f"   ⚠️ No hay rutina de actualización definida para {nombre}.")
+            print(f"   ⚠️️ No hay rutina de actualización definida para {nombre}.")
 
     # 3. Guardamos los cambios de vuelta en el fichero tarifas.json
     with open(ruta_json, "w", encoding="utf-8") as f:
