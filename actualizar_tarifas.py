@@ -4,45 +4,62 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
+def limpiar_html_agresivo(html_text):
+    """Elimina todas las etiquetas HTML y decodifica entidades para evitar que rompan la lectura."""
+    # Reemplazar entidades comunes
+    texto = html_text.replace('&euro;', '€').replace('&#8364;', '€').replace('&nbsp;', ' ')
+    # Eliminar cualquier etiqueta HTML usando regex
+    texto_sin_tags = re.sub(r'<[^>]+>', ' ', texto)
+    # Normalizar espacios
+    return ' '.join(texto_sin_tags.split())
+
 # --- FUNCIONES DE OBTENCIÓN DE DATOS PARA CADA COMERCIALIZADORA ---
 
 def obtener_precios_iberdrola_fijo():
     """Extrae los precios del Plan Online (Precio Fijo 24h) de Iberdrola"""
     url = "https://www.iberdrola.es/luz/tarifas/plan-online"
+    # Cabeceras avanzadas para evitar bloqueos WAF en GitHub Actions
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "es-ES,es;q=0.9",
-        "Cache-Control": "no-cache"
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Cache-Control": "max-age=0"
     }
     
-    error_return = {
-        "Precio_P_Punta": 0,
-        "Precio_P_Valle": 0,
-        "Precio_E_Fijo": 0
-    }
+    error_return = {"Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0}
     
     try:
         response = requests.get(url, headers=headers, timeout=15)
         
-        if response.status_code == 200 and "kWh" in response.text:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            texto_limpio = ' '.join(soup.get_text(separator=' ').split())
+        if response.status_code == 200:
+            # Limpieza profunda del texto web
+            texto_limpio = limpiar_html_agresivo(response.text)
             
-            match_energia = re.search(r'(\d+[,\.]\d+)\s*€\s*/\s*kWh', texto_limpio, re.IGNORECASE)
+            # Buscar precios con regex flexible a espacios
+            matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kWh', texto_limpio, re.IGNORECASE)
             matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kW\s*(?:d[ií]a|día)', texto_limpio, re.IGNORECASE)
-            potencias_validas = [float(p.replace(',', '.')) for p in matches_potencia if 0.01 <= float(p.replace(',', '.')) <= 0.30]
             
-            if match_energia and len(potencias_validas) >= 2:
-                precio_e_fijo = float(match_energia.group(1).replace(',', '.'))
-                print(f"   [Scraping OK] Iberdrola Fijo -> Energía: {precio_e_fijo}, Valle: {potencias_validas[0]}, Punta: {potencias_validas[1]}")
+            # Filtrar valores en rango de mercado y ordenarlos (de menor a mayor)
+            precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.05 <= float(p.replace(',', '.')) <= 0.40]
+            precios_p = sorted(list(set([float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.30])))
+            
+            if precios_e and len(precios_p) >= 2:
+                precio_e_fijo = precios_e[0]
+                # Por lógica de mercado, P_Valle es siempre más barato que P_Punta
                 return {
-                    "Precio_P_Punta": potencias_validas[1],
-                    "Precio_P_Valle": potencias_validas[0],
+                    "Precio_P_Punta": precios_p[-1], # El más alto
+                    "Precio_P_Valle": precios_p[0],  # El más bajo
                     "Precio_E_Fijo": precio_e_fijo
                 }
 
-        print("⚠️ Error o restricción en Iberdrola Fijo. Devolviendo 0...")
+        print("⚠️ Error o restricción WAF en Iberdrola Fijo. Devolviendo 0...")
         return error_return
             
     except Exception as e:
@@ -54,64 +71,52 @@ def obtener_precios_iberdrola_3p():
     url = "https://www.iberdrola.es/luz/tarifas/plan-online-tres-periodos"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "es-ES,es;q=0.9",
-        "Cache-Control": "no-cache"
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1"
     }
     
     error_return = {
-        "Precio_P_Punta": 0,
-        "Precio_P_Valle": 0,
-        "Precio_E_Punta": 0,
-        "Precio_E_Llano": 0,
-        "Precio_E_Valle": 0
+        "Precio_P_Punta": 0, "Precio_P_Valle": 0, 
+        "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0
     }
     
     try:
         response = requests.get(url, headers=headers, timeout=15)
         
         if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
+            texto_limpio = limpiar_html_agresivo(response.text)
             
-            for element in soup(["script", "style", "header", "footer", "nav"]):
-                element.extract()
-                
-            texto_limpio = ' '.join(soup.get_text(separator=' ').split())
-            
-            # Extracción y filtrado de precios de energía en rangos lógicos de mercado (0.03€ a 0.60€)
             matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kWh', texto_limpio, re.IGNORECASE)
-            precios_energia = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
-            
-            # Filtrar duplicados consecutivos (común en maquetaciones web responsive)
-            precios_unicos = []
-            for p in precios_energia:
-                if not precios_unicos or precios_unicos[-1] != p:
-                    precios_unicos.append(p)
-            
-            # Extracción y filtrado de precios de potencia (€/kW día)
             matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kW\s*(?:d[ií]a|día)', texto_limpio, re.IGNORECASE)
-            potencias_validas = [float(p.replace(',', '.')) for p in matches_potencia if 0.01 <= float(p.replace(',', '.')) <= 0.30]
             
-            if len(precios_unicos) >= 3 and len(potencias_validas) >= 2:
-                # Orden visual en web: Valle (0), Llano (1), Punta (2)
-                precio_e_valle = precios_unicos[0]
-                precio_e_llano = precios_unicos[1]
-                precio_e_punta = precios_unicos[2]
+            # Convertir a float y filtrar rangos lógicos
+            precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
+            precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.30]
+            
+            # Eliminar duplicados consecutivos (común por diseño responsive)
+            precios_e_unicos = []
+            for p in precios_e_raw:
+                if not precios_e_unicos or precios_e_unicos[-1] != p:
+                    precios_e_unicos.append(p)
+                    
+            precios_p_unicos = sorted(list(set(precios_p_raw)))
+            
+            if len(precios_e_unicos) >= 3 and len(precios_p_unicos) >= 2:
+                # Ordenar matemáticamente la energía (Valle siempre es el más bajo, Punta el más alto)
+                precios_e_ordenados = sorted(precios_e_unicos[:3])
                 
-                # Orden visual potencia en web: Valle (0), Punta (1)
-                precio_p_valle = potencias_validas[0]
-                precio_p_punta = potencias_validas[1]
-
-                print(f"   [Scraping OK] Iberdrola 3P -> E.Punta: {precio_e_punta}, E.Llano: {precio_e_llano}, E.Valle: {precio_e_valle} | P.Punta: {precio_p_punta}, P.Valle: {precio_p_valle}")
                 return {
-                    "Precio_P_Punta": precio_p_punta,
-                    "Precio_P_Valle": precio_p_valle,
-                    "Precio_E_Punta": precio_e_punta,
-                    "Precio_E_Llano": precio_e_llano,
-                    "Precio_E_Valle": precio_e_valle
+                    "Precio_P_Punta": precios_p_unicos[-1],  # El más alto
+                    "Precio_P_Valle": precios_p_unicos[0],   # El más bajo
+                    "Precio_E_Punta": precios_e_ordenados[-1], # El más alto
+                    "Precio_E_Llano": precios_e_ordenados[1],  # Medio
+                    "Precio_E_Valle": precios_e_ordenados[0]   # El más bajo
                 }
 
-        print("⚠️ No se pudieron extraer los precios de Iberdrola 3P correctamente. Devolviendo 0...")
+        print("⚠️️ No se pudieron extraer los precios de Iberdrola 3P correctamente. Devolviendo 0...")
         return error_return
             
     except Exception as e:
@@ -158,7 +163,7 @@ def actualizar_fichero_tarifas():
     ruta_json = "tarifas.json"
     
     if not os.path.exists(ruta_json):
-        print(f"⚠️️ Error crítico: No se encuentra el fichero {ruta_json}")
+        print(f"⚠ Error crítico: No se encuentra el fichero {ruta_json}")
         return
 
     with open(ruta_json, "r", encoding="utf-8") as f:
