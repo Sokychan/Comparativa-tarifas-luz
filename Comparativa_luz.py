@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import json
+import os
 
 # Configuración de la página
 st.set_page_config(
@@ -50,55 +52,28 @@ with st.expander("📝 Configuración de Datos de Consumo y Comercializadora Act
             precio_e_llano_actual = st.number_input("Coste kWh Zona Llano (€/kWh)", min_value=0.0, value=0.1320, format="%.4f")
             precio_e_valle_actual = st.number_input("Coste kWh Zona Valle (€/kWh)", min_value=0.0, value=0.0910, format="%.4f")
 
-# --- BASE DE DATOS DE TARIFAS DE MERCADO (MODELO 2.0TD) ---
-tarifas_db = [
-    {
-        "Comercializadora": "PVPC (Regulado REE)",
-        "Tipo": "Discriminación Horaria (3 periodos)",
-        "Precio_P_Punta": 0.0820,
-        "Precio_P_Valle": 0.0210,
-        "Precio_E_Punta": 0.1650,
-        "Precio_E_Llano": 0.1320,
-        "Precio_E_Valle": 0.0910,
-    },
-    {
-        "Comercializadora": "Octopus Energy",
-        "Tipo": "Precio Fijo (24h)",
-        "Precio_P_Punta": 0.0900,
-        "Precio_P_Valle": 0.0250,
-        "Precio_E_Fijo": 0.1300,
-    },
-    {
-        "Comercializadora": "Iberdrola",
-        "Tipo": "Plan Online (Precio Fijo)",
-        "Precio_P_Punta": 0.1100,
-        "Precio_P_Valle": 0.0300,
-        "Precio_E_Fijo": 0.1420,
-    },
-    {
-        "Comercializadora": "Endesa",
-        "Tipo": "One Luz (Precio Fijo)",
-        "Precio_P_Punta": 0.1050,
-        "Precio_P_Valle": 0.0280,
-        "Precio_E_Fijo": 0.1380,
-    },
-    {
-        "Comercializadora": "Naturgy",
-        "Tipo": "Tarifa Compromiso (Discriminación)",
-        "Precio_P_Punta": 0.0950,
-        "Precio_P_Valle": 0.0220,
-        "Precio_E_Punta": 0.1700,
-        "Precio_E_Llano": 0.1400,
-        "Precio_E_Valle": 0.1000,
-    },
-    {
-        "Comercializadora": "TotalEnergies",
-        "Tipo": "A Tu Aire FáciL (Precio Fijo)",
-        "Precio_P_Punta": 0.0880,
-        "Precio_P_Valle": 0.0240,
-        "Precio_E_Fijo": 0.1280,
-    }
-]
+# --- CARGA DINÁMICA DE TARIFAS DESDE EL FICHERO .JSON ---
+ARCHIVO_JSON = "tarifas.json"
+
+def cargar_tarifas_json(ruta):
+    """Carga la base de datos de tarifas desde un archivo JSON local de forma segura."""
+    if os.path.exists(ruta):
+        try:
+            with open(ruta, "r", encoding="utf-8") as f:
+                contenido = json.load(f)
+                return contenido.get("tarifas", [])
+        except Exception as e:
+            st.error(f"Error al leer el archivo JSON de tarifas: {e}")
+            return []
+    else:
+        st.warning(f"⚠️ No se ha encontrado el archivo `{ruta}`. Asegúrate de incluirlo en tu repositorio o generarlo mediante scraping.")
+        return []
+
+tarifas_db = cargar_tarifas_json(ARCHIVO_JSON)
+
+# Si la base de datos está vacía, detenemos la ejecución para evitar que falle el script
+if not tarifas_db:
+    st.stop()
 
 # --- AÑADIR LA TARIFA ACTUAL DEL USUARIO A LA COMPARATIVA ---
 if tipo_precio_actual == "Precio Fijo":
