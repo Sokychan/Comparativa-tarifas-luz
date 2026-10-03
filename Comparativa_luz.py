@@ -17,51 +17,9 @@ Calcula y compara de forma automática qué comercializadora se adapta mejor al 
 Introduce los datos a continuación y pulsa el botón para calcular.
 """)
 
-# --- CONFIGURACIÓN DE DATOS DE CONSUMO (FIJA, SIN EXPANDER) ---
-st.subheader("📊 Datos de consumo")
-
-col_titulo, col_selector = st.columns([2, 1])
-with col_selector:
-    modalidad_consumo = st.selectbox(
-        "Modalidad de tarifa",
-        ["Tarifa Fija", "Tarifa por Periodos"]
-    )
-
-if modalidad_consumo == "Tarifa Fija":
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        dias = st.number_input("Días del periodo de facturación", min_value=1, max_value=365, value=30, step=1)
-    with col2:
-        potencia = st.number_input("Potencia contratada (kW)", min_value=1.0, max_value=15.0, value=4.6, step=0.1)
-    with col3:
-        total_kwh = st.number_input("Energía consumida (kWh)", min_value=0.0, value=300.0, step=1.0)
-    
-    # Distribución estimada estándar para la simulación en tarifas con periodos
-    kwh_punta = total_kwh * 0.25
-    kwh_llano = total_kwh * 0.30
-    kwh_valle = total_kwh * 0.45
-else:
-    col1, col2 = st.columns(2)
-    with col1:
-        dias = st.number_input("Días del periodo de facturación", min_value=1, max_value=365, value=30, step=1)
-    with col2:
-        potencia = st.number_input("Potencia contratada (kW)", min_value=1.0, max_value=15.0, value=4.6, step=0.1)
-    
-    st.markdown("**Consumo en kWh por Periodo**")
-    col_p1, col_p2, col_p3 = st.columns(3)
-    with col_p1:
-        kwh_punta = st.number_input("kWh en Zona Punta", min_value=0.0, value=75.0, step=1.0)
-    with col_p2:
-        kwh_llano = st.number_input("kWh en Zona Llano", min_value=0.0, value=90.0, step=1.0)
-    with col_p3:
-        kwh_valle = st.number_input("kWh en Zona Valle", min_value=0.0, value=135.0, step=1.0)
-    
-    total_kwh = kwh_punta + kwh_llano + kwh_valle
-
-st.info(f"Consumo total acumulado: **{total_kwh:.1f} kWh**")
-
-# Botón de confirmación para realizar la comparación
-calcular_pulsado = st.button("🚀 Calcular y Comparar Tarifas", type="primary")
+# --- INICIALIZACIÓN DE ESTADO ---
+if "calculado" not in st.session_state:
+    st.session_state.calculado = False
 
 # --- CARGA DINÁMICA DE TARIFAS DESDE EL FICHERO .JSON ---
 ARCHIVO_JSON = "tarifas.json"
@@ -137,13 +95,57 @@ def formatear_precio(val):
 tarifas_fijas_db = [t for t in tarifas_db if "Precio_E_Fijo" in t]
 tarifas_horarias_db = [t for t in tarifas_db if "Precio_E_Fijo" not in t]
 
-# --- MOTOR DE CÁLCULO Y RESULTADOS (CONTROLADO POR BOTÓN) ---
-if "calculado" not in st.session_state:
-    st.session_state.calculado = False
+# --- CONFIGURACIÓN DE DATOS DE CONSUMO EN EXPANDER DINÁMICO ---
+# El expander se muestra abierto por defecto y se oculta/contrae automáticamente tras pulsar calcular
+with st.expander("📊 Datos de consumo y modalidad de tarifa", expanded=not st.session_state.calculado):
+    col_titulo, col_selector = st.columns([2, 1])
+    with col_selector:
+        modalidad_consumo = st.selectbox(
+            "Modalidad de tarifa",
+            ["Tarifa Fija", "Tarifa por Periodos"]
+        )
+
+    if modalidad_consumo == "Tarifa Fija":
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            dias = st.number_input("Días del periodo de facturación", min_value=1, max_value=365, value=30, step=1)
+        with col2:
+            potencia = st.number_input("Potencia contratada (kW)", min_value=1.0, max_value=15.0, value=4.6, step=0.1)
+        with col3:
+            total_kwh = st.number_input("Energía consumida (kWh)", min_value=0.0, value=300.0, step=1.0)
+        
+        # Distribución estimada estándar para la simulación en tarifas con periodos
+        kwh_punta = total_kwh * 0.25
+        kwh_llano = total_kwh * 0.30
+        kwh_valle = total_kwh * 0.45
+    else:
+        col1, col2 = st.columns(2)
+        with col1:
+            dias = st.number_input("Días del periodo de facturación", min_value=1, max_value=365, value=30, step=1)
+        with col2:
+            potencia = st.number_input("Potencia contratada (kW)", min_value=1.0, max_value=15.0, value=4.6, step=0.1)
+        
+        st.markdown("**Consumo en kWh por Periodo**")
+        col_p1, col_p2, col_p3 = st.columns(3)
+        with col_p1:
+            kwh_punta = st.number_input("kWh en Zona Punta", min_value=0.0, value=75.0, step=1.0)
+        with col_p2:
+            kwh_llano = st.number_input("kWh en Zona Llano", min_value=0.0, value=90.0, step=1.0)
+        with col_p3:
+            kwh_valle = st.number_input("kWh en Zona Valle", min_value=0.0, value=135.0, step=1.0)
+        
+        total_kwh = kwh_punta + kwh_llano + kwh_valle
+
+    st.info(f"Consumo total acumulado: **{total_kwh:.1f} kWh**")
+
+# Botón de confirmación para realizar la comparación
+calcular_pulsado = st.button("🚀 Calcular y Comparar Tarifas", type="primary")
 
 if calcular_pulsado:
     st.session_state.calculado = True
+    st.rerun()
 
+# --- MOTOR DE CÁLCULO Y RESULTADOS ---
 if st.session_state.calculado:
     st.markdown("---")
     
