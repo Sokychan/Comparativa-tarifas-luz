@@ -11,20 +11,53 @@ def limpiar_html_agresivo(html_text):
     return ' '.join(texto_sin_tags.split())
 
 def obtener_html_con_navegador(url):
-    """Abre la web usando un navegador Chromium real para superar el bloqueo WAF/Cloudflare."""
+    """Abre la web configurando huella digital humana para evitar el bloqueo por IP/WAF."""
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            # Banderas de Chromium para ocultar que es una instancia automatizada
+            browser = p.chromium.launch(
+                headless=True,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-web-security",
+                    "--window-size=1920,1080"
+                ]
+            )
+            
+            # Perfil con geolocalización, zona horaria e idioma de España
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                viewport={"width": 1280, "height": 800}
+                viewport={"width": 1920, "height": 1080},
+                locale="es-ES",
+                timezone_id="Europe/Madrid",
+                extra_http_headers={
+                    "Accept-Language": "es-ES,es;q=0.9",
+                    "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+                    "Sec-Ch-Ua-Mobile": "?0",
+                    "Sec-Ch-Ua-Platform": '"Windows"',
+                }
             )
+            
             page = context.new_page()
-            # Cargar página y esperar a que termine de cargar la red
-            page.goto(url, wait_until="networkidle", timeout=30000)
+            
+            # Inyección para eliminar la propiedad 'navigator.webdriver' que delata a los bots
+            page.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+            """)
+            
+            # Navegar simulando comportamiento humano
+            page.goto(url, wait_until="domcontentloaded", timeout=40000)
+            page.wait_for_timeout(3000) # Espera 3 segundos para renderizado de JS
+            
             content = page.content()
             browser.close()
             return content
+            
     except Exception as e:
         print(f"⚠️ Error al renderizar navegador en {url}: {e}")
         return None
