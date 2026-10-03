@@ -1,23 +1,34 @@
 {
-  "actualizado": "2026-10-03",
-  "planes": [
+  "tarifas": [
     {
-      "id": "plan_online_fijo",
-      "tipo": "precio_fijo",
-      "nombre": "Plan Online",
-      "precio_kwh": 0.149,
-      "potencia_punta": 0.1191,
-      "potencia_valle": 0.0780
+      "Comercializadora": "PVPC (Regulado REE)",
+      "Tipo": "Discriminación Horaria (3 periodos)",
+      "Precio_P_Punta": 0.0820,
+      "Precio_P_Valle": 0.0210,
+      "Precio_E_Punta": 0.1650,
+      "Precio_E_Llano": 0.1320,
+      "Precio_E_Valle": 0.0910
     },
     {
-      "id": "plan_online_3p",
-      "tipo": "tres_periodos",
-      "nombre": "Plan Online 3 Periodos",
-      "precio_punta": 0.217,
-      "precio_llano": 0.162,
-      "precio_valle": 0.129,
-      "potencia_punta": 0.0910,
-      "potencia_valle": 0.0134
+      "Comercializadora": "Octopus Energy",
+      "Tipo": "Precio Fijo (24h)",
+      "Precio_P_Punta": 0.0900,
+      "Precio_P_Valle": 0.0250,
+      "Precio_E_Fijo": 0.1300
+    },
+    {
+      "Comercializadora": "Iberdrola",
+      "Tipo": "Plan Online (Precio Fijo)",
+      "Precio_P_Punta": 0.1100,
+      "Precio_P_Valle": 0.0300,
+      "Precio_E_Fijo": 0.1420
+    },
+    {
+      "Comercializadora": "Endesa",
+      "Tipo": "One Luz (Precio Fijo)",
+      "Precio_P_Punta": 0.1050,
+      "Precio_P_Valle": 0.0280,
+      "Precio_E_Fijo": 0.1380
     }
   ]
 }
