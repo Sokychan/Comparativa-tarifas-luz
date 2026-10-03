@@ -45,6 +45,12 @@ def obtener_precios_iberdrola_fijo():
         
         matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kWh', texto_limpio, re.IGNORECASE)
         matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kW\s*(?:d[ií]a|día)', texto_limpio, re.IGNORECASE)
+
+        # --- LÍNEAS DE DEPURACIÓN ---
+        print(f"🔍 [DEBUG] Longitud texto extraído: {len(texto_limpio)} caracteres.")
+        print(f"🔍 [DEBUG] Muestras de energía encontradas: {matches_energia}")
+        print(f"🔍 [DEBUG] Muestras de potencia encontradas: {matches_potencia}")
+        # -----------------------------
         
         precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.05 <= float(p.replace(',', '.')) <= 0.40]
         precios_p = sorted(list(set([float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.30])))
