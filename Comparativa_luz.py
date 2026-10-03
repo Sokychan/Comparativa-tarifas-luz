@@ -38,35 +38,12 @@ def cargar_tarifas_json(ruta):
         st.warning(f"⚠️ No se ha encontrado el archivo `{ruta}`. Se utilizará una estructura de ejemplo integrada.")
         return [
             {
-                "Comercializadora": "PVPC (Regulado REE)",
-                "Tipo": "Discriminación Horaria (3 periodos)",
-                "Precio_P_Punta": 0.0820,
-                "Precio_P_Valle": 0.0210,
-                "Precio_E_Punta": 0.1650,
-                "Precio_E_Llano": 0.1320,
-                "Precio_E_Valle": 0.0910,
-            },
-            {
-                "Comercializadora": "Octopus Energy",
-                "Tipo": "Precio Fijo (24h)",
-                "Precio_P_Punta": 0.0900,
-                "Precio_P_Valle": 0.0250,
-                "Precio_E_Fijo": 0.1300,
-            },
-            {
                 "Comercializadora": "Iberdrola",
                 "Tipo": "Plan Online (Precio Fijo)",
                 "Precio_P_Punta": 0.1100,
                 "Precio_P_Valle": 0.0300,
                 "Precio_E_Fijo": 0.1420,
             },
-            {
-                "Comercializadora": "Endesa",
-                "Tipo": "One Luz (Precio Fijo)",
-                "Precio_P_Punta": 0.1050,
-                "Precio_P_Valle": 0.0280,
-                "Precio_E_Fijo": 0.1380,
-            }
         ]
 
 tarifas_db = cargar_tarifas_json(ARCHIVO_JSON)
