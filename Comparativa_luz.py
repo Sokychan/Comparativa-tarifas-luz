@@ -11,26 +11,46 @@ st.set_page_config(
 st.title("⚡ Comparador Inteligente de Tarifas de Luz (España)")
 st.markdown("""
 Calcula y compara de forma automática qué comercializadora se adapta mejor a tu estilo de vida y consumo real. 
-Introduce tus datos en la barra lateral para ver los resultados actualizados.
+Introduce tus datos y los de tu tarifa actual en el panel desplegable inferior para ver los resultados actualizados.
 """)
 
-# --- BARRA LATERAL: ENTRADA DE DATOS ---
-st.sidebar.header("📝 Tus Datos de Facturación")
+# --- PANEL DESPLEGABLE DE ENTRADA DE DATOS ---
+with st.expander("📝 Configuración de Datos de Consumo y Comercializadora Actual", expanded=True):
+    col_consumo, col_actual = st.columns(2)
+    
+    with col_consumo:
+        st.subheader("📊 Datos de consumo a comparar")
+        dias = st.number_input("Días del periodo de facturación", min_value=1, max_value=365, value=30, step=1)
+        potencia = st.number_input("Potencia contratada (kW)", min_value=1.0, max_value=15.0, value=4.6, step=0.1)
+        
+        st.markdown("**Consumo en kWh por Periodo**")
+        kwh_punta = st.number_input("kWh en Zona Punta", min_value=0.0, value=75.0, step=1.0)
+        kwh_llano = st.number_input("kWh en Zona Llano", min_value=0.0, value=90.0, step=1.0)
+        kwh_valle = st.number_input("kWh en Zona Valle", min_value=0.0, value=135.0, step=1.0)
+        
+        total_kwh = kwh_punta + kwh_llano + kwh_valle
+        st.info(f"Consumo total acumulado: **{total_kwh:.1f} kWh**")
 
-dias = st.sidebar.number_input("Días del periodo de facturación", min_value=1, max_value=365, value=30, step=1)
-potencia = st.sidebar.number_input("Potencia contratada (kW)", min_value=1.0, max_value=15.0, value=4.6, step=0.1)
+    with col_actual:
+        st.subheader("💡 Datos de comercializadora actual")
+        nombre_actual = st.text_input("Nombre de la comercializadora", value="Mi Comercializadora Actual")
+        precio_p1_actual = st.number_input("Precio potencia P1 (€/kW·día)", min_value=0.0, value=0.0900, format="%.4f")
+        precio_p2_actual = st.number_input("Precio potencia P2 (€/kW·día)", min_value=0.0, value=0.0250, format="%.4f")
+        
+        st.markdown("**Coste kWh**")
+        tipo_precio_actual = st.selectbox(
+            "Selecciona la modalidad de precio de tu tarifa",
+            ["Precio Fijo", "Precio por Horas (3 Periodos)"]
+        )
+        
+        if tipo_precio_actual == "Precio Fijo":
+            precio_e_fijo_actual = st.number_input("Importe kWh fijo (€/kWh)", min_value=0.0, value=0.1300, format="%.4f")
+        else:
+            precio_e_punta_actual = st.number_input("Coste kWh Zona Punta (€/kWh)", min_value=0.0, value=0.1650, format="%.4f")
+            precio_e_llano_actual = st.number_input("Coste kWh Zona Llano (€/kWh)", min_value=0.0, value=0.1320, format="%.4f")
+            precio_e_valle_actual = st.number_input("Coste kWh Zona Valle (€/kWh)", min_value=0.0, value=0.0910, format="%.4f")
 
-st.sidebar.subheader("Consumo en kWh por Periodo")
-kwh_punta = st.sidebar.number_input("kWh en Zona Punta", min_value=0.0, value=75.0, step=1.0)
-kwh_llano = st.sidebar.number_input("kWh en Zona Llano", min_value=0.0, value=90.0, step=1.0)
-kwh_valle = st.sidebar.number_input("kWh en Zona Valle", min_value=0.0, value=135.0, step=1.0)
-
-total_kwh = kwh_punta + kwh_llano + kwh_valle
-st.sidebar.info(f"Consumo total acumulado: **{total_kwh:.1f} kWh**")
-
-# --- BASE DE DATOS DE TARIFAS (MODELO 2.0TD) ---
-# Precios de referencia orientativos (€/kW·día para potencia y €/kWh para energía)
-# Nota: Puedes actualizar estos valores periódicamente o conectarlos a una API externa (ej. REE/ESIOS).
+# --- BASE DE DATOS DE TARIFAS DE MERCADO (MODELO 2.0TD) ---
 tarifas_db = [
     {
         "Comercializadora": "PVPC (Regulado REE)",
@@ -80,12 +100,35 @@ tarifas_db = [
     }
 ]
 
+# --- AÑADIR LA TARIFA ACTUAL DEL USUARIO A LA COMPARATIVA ---
+if tipo_precio_actual == "Precio Fijo":
+    tarifa_actual_usuario = {
+        "Comercializadora": f"📍 {nombre_actual} (Actual)",
+        "Tipo": "Precio Fijo (Tu tarifa)",
+        "Precio_P_Punta": precio_p1_actual,
+        "Precio_P_Valle": precio_p2_actual,
+        "Precio_E_Fijo": precio_e_fijo_actual,
+    }
+else:
+    tarifa_actual_usuario = {
+        "Comercializadora": f"📍 {nombre_actual} (Actual)",
+        "Tipo": "Discriminación Horaria (Tu tarifa)",
+        "Precio_P_Punta": precio_p1_actual,
+        "Precio_P_Valle": precio_p2_actual,
+        "Precio_E_Punta": precio_e_punta_actual,
+        "Precio_E_Llano": precio_e_llano_actual,
+        "Precio_E_Valle": precio_e_valle_actual,
+    }
+
+# Insertamos la tarifa del usuario al inicio de la lista
+tarifas_db.insert(0, tarifa_actual_usuario)
+
 # --- MOTOR DE CÁLCULO ---
 resultados = []
 alquiler_contador = 0.81 * (dias / 30)  # Coste estimado alquiler de contador mensual
 
 for t in tarifas_db:
-    # Coste de potencia (asumiendo reparto simétrico aproximado entre P1 y P2 para simplificar la simulación)
+    # Coste de potencia (repartido simétricamente entre P1 y P2 para la simulación)
     coste_potencia = potencia * (t["Precio_P_Punta"] + t["Precio_P_Valle"]) * (dias / 2)
     
     # Coste de energía según si es precio fijo o discriminación horaria
