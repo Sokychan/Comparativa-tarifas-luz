@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+import re
 
 # Configuración de la página
 st.set_page_config(
@@ -131,21 +132,49 @@ def formatear_precio(val):
     except (ValueError, TypeError):
         return str(val)
 
-# --- TABLA DE PRECIOS DE LAS COMERCIALIZADORAS ---
-st.subheader("📋 Precios Unitarios de las Tarifas del Mercado")
-tabla_precios_raw = []
-for t in tarifas_db:
-    tabla_precios_raw.append({
-        "Comercializadora": t.get("Comercializadora"),
-        "Tipo": t.get("Tipo"),
-        "Potencia Punta (€/kW·día)": formatear_precio(t.get("Precio_P_Punta")),
-        "Potencia Valle (€/kW·día)": formatear_precio(t.get("Precio_P_Valle")),
-        "Energía Punta (€/kWh)": formatear_precio(t.get("Precio_E_Punta", t.get("Precio_E_Fijo"))),
-        "Energía Llano (€/kWh)": formatear_precio(t.get("Precio_E_Llano", t.get("Precio_E_Fijo"))),
-        "Energía Valle (€/kWh)": formatear_precio(t.get("Precio_E_Valle", t.get("Precio_E_Fijo"))),
-    })
-df_precios_json = pd.DataFrame(tabla_precios_raw)
-st.dataframe(df_precios_json, use_container_width=True)
+# --- SEPARACIÓN Y VISUALIZACIÓN DE TABLAS DE PRECIOS UNITARIOS ---
+tarifas_fijas_db = [t for t in tarifas_db if "Precio_E_Fijo" in t]
+tarifas_horarias_db = [t for t in tarifas_db if "Precio_E_Fijo" not in t]
+
+st.subheader("📋 Tarifas con Precio Fijo de Energía")
+if tarifas_fijas_db:
+    tabla_fijas_raw = []
+    for t in tarifas_fijas_db:
+        tipo_orig = t.get("Tipo", "")
+        if "(" in tipo_orig and ")" in tipo_orig:
+            tipo_mod = re.sub(r'\(.*?\)', '(Precio fijo 24h)', tipo_orig)
+        else:
+            tipo_mod = f"{tipo_orig} (Precio fijo 24h)"
+            
+        tabla_fijas_raw.append({
+            "Comercializadora": t.get("Comercializadora"),
+            "Tipo": tipo_mod,
+            "Potencia Punta (€/kW·día)": formatear_precio(t.get("Precio_P_Punta")),
+            "Potencia Valle (€/kW·día)": formatear_precio(t.get("Precio_P_Valle")),
+            "Energía Fija (€/kWh)": formatear_precio(t.get("Precio_E_Fijo")),
+        })
+    df_fijas = pd.DataFrame(tabla_fijas_raw)
+    st.dataframe(df_fijas, use_container_width=True)
+else:
+    st.info("No hay tarifas con precio fijo de energía configuradas.")
+
+st.subheader("📋 Tarifas con Precio por Horas / Periodos de Energía")
+if tarifas_horarias_db:
+    tabla_horarias_raw = []
+    for t in tarifas_horarias_db:
+        tabla_horarias_raw.append({
+            "Comercializadora": t.get("Comercializadora"),
+            "Tipo": t.get("Tipo"),
+            "Potencia Punta (€/kW·día)": formatear_precio(t.get("Precio_P_Punta")),
+            "Potencia Valle (€/kW·día)": formatear_precio(t.get("Precio_P_Valle")),
+            "Energía Punta (€/kWh)": formatear_precio(t.get("Precio_E_Punta")),
+            "Energía Llano (€/kWh)": formatear_precio(t.get("Precio_E_Llano")),
+            "Energía Valle (€/kWh)": formatear_precio(t.get("Precio_E_Valle")),
+        })
+    df_horarias = pd.DataFrame(tabla_horarias_raw)
+    st.dataframe(df_horarias, use_container_width=True)
+else:
+    st.info("No hay tarifas con precio por horas o periodos configuradas.")
 
 st.markdown("---")
 
