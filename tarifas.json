@@ -26,11 +26,11 @@
     {
       "Comercializadora": "EnergyaVM",
       "Tipo": "Fórmula fija 3 Periodos luz",
-      "Precio_P_Punta": 0.1417,
-      "Precio_P_Valle": 0.0967,
-      "Precio_E_Punta": 0.229,
-      "Precio_E_Llano": 0.1717,
-      "Precio_E_Valle": 0.0967
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Punta": 0,
+      "Precio_E_Llano": 0,
+      "Precio_E_Valle": 0
     },
     {
       "Comercializadora": "Visalia",
