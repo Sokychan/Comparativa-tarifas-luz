@@ -13,9 +13,23 @@ if "calculado" not in st.session_state:
 
 SHEET_ID = "1H54QZ3ln7QmHwC5Tf3jF-V4XupIfwZfvSJBJNg3rkTQ"
 
+def limpiar_float(valor):
+    """Convierte celdas con comas o puntos decimales a float de forma segura."""
+    if pd.isna(valor):
+        return 0.0
+    if isinstance(valor, (int, float)):
+        return float(valor)
+    val_str = str(valor).strip()
+    # Reemplazar coma decimal por punto
+    val_str = val_str.replace(',', '.')
+    try:
+        return float(val_str)
+    except:
+        return 0.0
+
 @st.cache_data(ttl=600)
 def cargar_tarifas_desde_sheets():
-    """Descarga las dos pestañas de Google Sheets adaptándose a los nombres de columna del usuario"""
+    """Descarga las dos pestañas de Google Sheets y limpia los formatos numéricos"""
     try:
         # Pestaña de Tarifas Fijas
         url_fija = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Tarifa%20Fija"
@@ -36,9 +50,9 @@ def cargar_tarifas_desde_sheets():
             tarifas_db.append({
                 "Comercializadora": str(row.get("Comercializadora", "")).strip(),
                 "Tipo": str(row.get("Nombre de la tarifa", "")).strip(),
-                "Precio_P_Punta": float(row.get("Precio potencia punta", 0)),
-                "Precio_P_Valle": float(row.get("Precio potencia valle", 0)),
-                "Precio_E_Fijo": float(row.get("Precio energía", 0))
+                "Precio_P_Punta": limpiar_float(row.get("Precio potencia punta", 0)),
+                "Precio_P_Valle": limpiar_float(row.get("Precio potencia valle", 0)),
+                "Precio_E_Fijo": limpiar_float(row.get("Precio energía", 0))
             })
             
         # Procesar Periodos
@@ -48,11 +62,11 @@ def cargar_tarifas_desde_sheets():
             tarifas_db.append({
                 "Comercializadora": str(row.get("Comercializadora", "")).strip(),
                 "Tipo": str(row.get("Nombre de la tarifa", "")).strip(),
-                "Precio_P_Punta": float(row.get("Precio potencia punta", 0)),
-                "Precio_P_Valle": float(row.get("Precio potencia valle", 0)),
-                "Precio_E_Punta": float(row.get("Precio energía punta", 0)),
-                "Precio_E_Llano": float(row.get("Precio energía llano", 0)),
-                "Precio_E_Valle": float(row.get("Precio energía valle", 0))
+                "Precio_P_Punta": limpiar_float(row.get("Precio potencia punta", 0)),
+                "Precio_P_Valle": limpiar_float(row.get("Precio potencia valle", 0)),
+                "Precio_E_Punta": limpiar_float(row.get("Precio energía punta", 0)),
+                "Precio_E_Llano": limpiar_float(row.get("Precio energía llano", 0)),
+                "Precio_E_Valle": limpiar_float(row.get("Precio energía valle", 0))
             })
             
         return tarifas_db
