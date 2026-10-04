@@ -51,19 +51,19 @@
     {
       "Comercializadora": "Octopus Energy",
       "Tipo": "Octopus Relax",
-      "Precio_P_Punta": 0.226,
+      "Precio_P_Punta": 0.232,
       "Precio_P_Valle": 0.06,
-      "Precio_E_Fijo": 0.226
+      "Precio_E_Fijo": 0.232
     },
     {
       "Comercializadora": "Octopus Energy",
       "Tipo": "Octopus 3",
-      "Precio_P_Punta": 0.226,
+      "Precio_P_Punta": 0.232,
       "Precio_P_Valle": 0.06,
       "Precio_E_Punta": 0,
       "Precio_E_Llano": 0,
       "Precio_E_Valle": 0,
-      "Precio_E_Fijo": 0.226
+      "Precio_E_Fijo": 0.232
     },
     {
       "Comercializadora": "Nufri",
