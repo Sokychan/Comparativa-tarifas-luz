@@ -2,7 +2,7 @@ import re
 from playwright.sync_api import sync_playwright
 
 def obtener_texto_modal(nombre_tarifa):
-    """Localiza la tarjeta exacta, pulsa 'Ver precios' y extrae el texto del modal desplegado sin errores de strict mode."""
+    """Localiza la tarjeta exacta de Nufri, hace clic en 'Ver precios' y extrae el contenido del desplegable."""
     url = "https://www.energianufri.com/es/tarifas-luz"
     try:
         with sync_playwright() as p:
@@ -30,7 +30,7 @@ def obtener_texto_modal(nombre_tarifa):
             page.goto(url, wait_until="domcontentloaded", timeout=40000)
             page.wait_for_timeout(2500)
             
-            # Aceptar cookies automáticamente si aparece el aviso
+            # Aceptar cookies automáticamente
             for texto_btn in ["Aceptar", "Permitir todas", "Aceptar y continuar", "Consentir"]:
                 try:
                     boton = page.locator(f"button:has-text('{texto_btn}')")
@@ -41,24 +41,43 @@ def obtener_texto_modal(nombre_tarifa):
                 except:
                     pass
             
-            # Localizar la tarjeta mediante filtros nativos y aplicar .first para evitar violaciones de modo estricto
-            tarjeta = page.locator("div, article, section").filter(has_text=nombre_tarifa).filter(has=page.locator("text=Ver precios")).first
+            btn_clicado = False
             
-            if tarjeta.count() > 0:
-                btn_ver = tarjeta.locator("text=Ver precios").first
-                if btn_ver.count() > 0:
-                    btn_ver.click()
+            # Estrategia 1: Buscar botón 'Ver precios' en el bloque con el nombre exacto de la tarifa
+            tarjetas = page.locator("div").filter(has_text=re.compile(re.escape(nombre_tarifa), re.IGNORECASE))
+            for i in range(tarjetas.count()):
+                t = tarjetas.nth(i)
+                btn = t.locator("button, a").filter(has_text=re.compile(r"ver\s+precios", re.IGNORECASE))
+                if btn.count() > 0 and btn.first.is_visible():
+                    try:
+                        btn.first.click(force=True)
+                        btn_clicado = True
+                        page.wait_for_timeout(2000)
+                        break
+                    except:
+                        pass
+            
+            # Estrategia 2 (Respaldo por orden de tarjetas en la cuadrícula de Nufri)
+            if not btn_clicado:
+                btns = page.locator("button, a").filter(has_text=re.compile(r"ver\s+precios", re.IGNORECASE))
+                num_btns = btns.count()
+                if num_btns >= 5:
+                    if "sin horarios" in nombre_tarifa.lower():
+                        btns.nth(4).click(force=True) # Tarjeta 5: Universal sin horarios
+                    else:
+                        btns.nth(3).click(force=True) # Tarjeta 4: Universal con horarios
+                    btn_clicado = True
                     page.wait_for_timeout(2000)
-            
-            # Priorizar el cuadro desplegable/dialogo emergente activo
-            dialogo = page.locator("[role='dialog'], [data-state='open'], .modal, .sheet-content").first
-            if dialogo.count() > 0 and dialogo.is_visible():
-                texto_modal = dialogo.inner_text()
+
+            # Intentar extraer el texto del diálogo emergente (modal / sheet)
+            modal = page.locator("[role='dialog'], [data-state='open'], .sheet-content").first
+            if modal.count() > 0 and modal.is_visible():
+                texto_extraido = modal.inner_text()
             else:
-                texto_modal = tarjeta.inner_text()
+                texto_extraido = page.evaluate("document.body.innerText")
                 
             browser.close()
-            return texto_modal
+            return texto_extraido
             
     except Exception as e:
         print(f"⚠️ Error al renderizar navegador en Nufri ({nombre_tarifa}): {e}")
@@ -76,6 +95,7 @@ def obtener_precios_fijo():
         t_lower = texto.lower()
         
         matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kwh', t_lower)
+        # Exclusión estricta de /kWh mediante (?!h) para evitar capturar precios de energía como potencia
         matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kw(?!h)', t_lower)
         
         precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.50]
@@ -92,6 +112,8 @@ def obtener_precios_fijo():
                 potencias_diarias.append(p)
                 
         potencias_diarias = sorted(list(set(potencias_diarias)))
+        
+        print(f"🔍 [DEBUG] Nufri Fijo - Energías: {precios_e}, Potencias: {potencias_diarias}")
         
         if precios_e and potencias_diarias:
             p_val = potencias_diarias[0]
@@ -148,6 +170,8 @@ def obtener_precios_3p():
             if not precios_e_unicos or precios_e_unicos[-1] != p:
                 precios_e_unicos.append(p)
                 
+        print(f"🔍 [DEBUG] Nufri 3P - Energías: {precios_e_unicos}, Potencias: {potencias_diarias}")
+        
         if len(precios_e_unicos) >= 3 and len(potencias_diarias) >= 1:
             e_sort = sorted(precios_e_unicos[:3])
             p_val = potencias_diarias[0]
