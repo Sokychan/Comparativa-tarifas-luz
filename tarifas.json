@@ -28,9 +28,7 @@
       "Tipo": "Fórmula fija 3 Periodos luz",
       "Precio_P_Punta": 0.102252,
       "Precio_P_Valle": 0.003014,
-      "Precio_E_Punta": 0.229,
-      "Precio_E_Llano": 0.189,
-      "Precio_E_Valle": 0.129
+      "Precio_E_Fijo": 0.12675
     },
     {
       "Comercializadora": "Visalia",
@@ -74,11 +72,11 @@
     {
       "Comercializadora": "Nufri",
       "Tipo": "Universal con horarios",
-      "Precio_P_Punta": 0.075903,
-      "Precio_P_Valle": 0.029385,
-      "Precio_E_Punta": 0.210915,
-      "Precio_E_Llano": 0.132778,
-      "Precio_E_Valle": 0.098638
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Punta": 0,
+      "Precio_E_Llano": 0,
+      "Precio_E_Valle": 0
     },
     {
       "Comercializadora": "Imagina energía",
