@@ -1,14 +1,8 @@
 import re
 from playwright.sync_api import sync_playwright
 
-def limpiar_html_agresivo(html_text):
-    """Elimina etiquetas HTML y normaliza espacios."""
-    texto = html_text.replace('&euro;', '€').replace('&#8364;', '€').replace('&nbsp;', ' ')
-    texto_sin_tags = re.sub(r'<[^>]+>', ' ', texto)
-    return ' '.join(texto_sin_tags.split())
-
-def obtener_html_con_navegador(url):
-    """Abre la web configurando huella digital humana para evitar bloqueos."""
+def obtener_texto_visible(url):
+    """Abre la web y extrae únicamente el texto visible (innerText) tal y como lo ve el usuario, sin código HTML."""
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(
@@ -33,60 +27,60 @@ def obtener_html_con_navegador(url):
             page = context.new_page()
             page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
             
-            page.goto(url, wait_until="domcontentloaded", timeout=40000)
-            page.wait_for_timeout(3000) # Espera para asegurar que los scripts visuales carguen
+            # Cargar la página y esperar a que la red esté inactiva
+            page.goto(url, wait_until="networkidle", timeout=40000)
+            page.wait_for_timeout(2000) # Breve espera extra para renderizado final
             
-            content = page.content()
+            # Extraer el texto visual puro
+            texto = page.evaluate("document.body.innerText")
             browser.close()
-            return content
+            return texto
             
     except Exception as e:
         print(f"⚠️ Error al renderizar navegador en Octopus: {e}")
         return None
-
-def extraer_bloque(texto, inicio_str, delimitadores_fin):
-    """Recorta el texto desde una palabra clave hasta que encuentra otra tarifa."""
-    idx_ini = texto.find(inicio_str)
-    if idx_ini == -1:
-        return ""
-    
-    idx_fin = len(texto)
-    for d in delimitadores_fin:
-        idx = texto.find(d, idx_ini + len(inicio_str))
-        if idx != -1 and idx < idx_fin:
-            idx_fin = idx
-            
-    return texto[idx_ini:idx_fin]
 
 def obtener_precios_fijo():
     """Extrae los precios de la tarifa 'Octopus Relax' (Fija 24h)"""
     url = "https://octopusenergy.es/precios"
     error_return = {"Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0}
     
-    html = obtener_html_con_navegador(url)
-    if not html: return error_return
+    texto_visible = obtener_texto_visible(url)
+    if not texto_visible:
+        return error_return
 
     try:
-        texto_limpio = limpiar_html_agresivo(html).lower()
+        texto_limpio = texto_visible.lower()
         
-        # Aislamiento de la columna Octopus Relax
-        bloque = extraer_bloque(texto_limpio, "octopus relax", ["octopus flexi", "octopus 3"])
+        # Aislar exclusivamente la columna de "Octopus Relax"
+        idx_relax = texto_limpio.find("octopus relax")
+        idx_flexi = texto_limpio.find("octopus flexi")
         
-        if not bloque:
-            print("⚠️ No se encontró la sección 'Octopus Relax'.")
+        if idx_relax == -1:
+            print("⚠️ No se encontró la columna 'Octopus Relax'.")
             return error_return
-
+            
+        bloque = texto_limpio[idx_relax:idx_flexi] if idx_flexi != -1 else texto_limpio[idx_relax:idx_relax+1000]
+        
+        # Buscar el precio de energía (€/kWh)
         matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kwh', bloque)
+        
+        # Buscar los precios de potencia mensual (€/kW/mes) 
+        # La regex se detiene en kW, por lo que captura el número sin importar si detrás pone 'mes'
         matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw', bloque)
         
-        precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.05 <= float(p.replace(',', '.')) <= 0.40]
-        precios_p = sorted(list(set([float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.30])))
-        
-        if precios_e and len(precios_p) >= 2:
+        if matches_energia and len(matches_potencia) >= 2:
+            precio_e = float(matches_energia[0].replace(',', '.'))
+            
+            # En la web visualmente aparecen dos potencias (Punta y Valle)
+            p_punta_mes = float(matches_potencia[0].replace(',', '.'))
+            p_valle_mes = float(matches_potencia[1].replace(',', '.'))
+            
+            # Conversión a diario: dividimos entre 30 (La web indica explícitamente "*Precio calculado para 30 días")
             return {
-                "Precio_P_Punta": precios_p[-1], # El más alto es Punta
-                "Precio_P_Valle": precios_p[0],  # El más bajo es Valle
-                "Precio_E_Fijo": precios_e[0]
+                "Precio_P_Punta": round(p_punta_mes / 30, 6),
+                "Precio_P_Valle": round(p_valle_mes / 30, 6),
+                "Precio_E_Fijo": precio_e
             }
             
         print("⚠️ No se pudieron extraer valores numéricos completos de Octopus Relax.")
@@ -101,42 +95,43 @@ def obtener_precios_3p():
     url = "https://octopusenergy.es/precios"
     error_return = {"Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0}
     
-    html = obtener_html_con_navegador(url)
-    if not html: return error_return
+    texto_visible = obtener_texto_visible(url)
+    if not texto_visible:
+        return error_return
 
     try:
-        texto_limpio = limpiar_html_agresivo(html).lower()
+        texto_limpio = texto_visible.lower()
         
-        # Aislamiento de la columna Octopus 3
-        bloque = extraer_bloque(texto_limpio, "octopus 3", ["te recomendamos", "octopus relax", "octopus flexi"])
+        # Aislar exclusivamente la columna de "Octopus 3"
+        idx_3p = texto_limpio.find("octopus 3")
+        idx_relax = texto_limpio.find("octopus relax")
         
-        if not bloque:
-            print("⚠️ No se encontró la sección 'Octopus 3'.")
+        if idx_3p == -1:
+            print("⚠️ No se encontró la columna 'Octopus 3'.")
             return error_return
-
+            
+        bloque = texto_limpio[idx_3p:idx_relax] if idx_relax != -1 else texto_limpio[idx_3p:idx_3p+1000]
+        
         matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kwh', bloque)
         matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw', bloque)
         
-        precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
-        precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.30]
-        
-        # Eliminar duplicados consecutivos
-        precios_e_unicos = []
-        for p in precios_e_raw:
-            if not precios_e_unicos or precios_e_unicos[-1] != p:
-                precios_e_unicos.append(p)
-                
-        precios_p = sorted(list(set(precios_p_raw)))
-        
-        if len(precios_e_unicos) >= 3 and len(precios_p) >= 2:
-            precios_e_ordenados = sorted(precios_e_unicos[:3])
+        if len(matches_energia) >= 3 and len(matches_potencia) >= 2:
+            # Orden visual secuencial idéntico a la web: Punta (P1), Llano (P2), Valle (P3)
+            e_punta = float(matches_energia[0].replace(',', '.'))
+            e_llano = float(matches_energia[1].replace(',', '.'))
+            e_valle = float(matches_energia[2].replace(',', '.'))
             
+            # Orden visual secuencial: Punta (P1) mensual, Valle (P2) mensual
+            p_punta_mes = float(matches_potencia[0].replace(',', '.'))
+            p_valle_mes = float(matches_potencia[1].replace(',', '.'))
+            
+            # Devolvemos aplicando la división por 30 días para compatibilidad global
             return {
-                "Precio_P_Punta": precios_p[-1],
-                "Precio_P_Valle": precios_p[0],
-                "Precio_E_Punta": precios_e_ordenados[-1], # El más alto
-                "Precio_E_Llano": precios_e_ordenados[1],  # El medio
-                "Precio_E_Valle": precios_e_ordenados[0]   # El más bajo
+                "Precio_P_Punta": round(p_punta_mes / 30, 6),
+                "Precio_P_Valle": round(p_valle_mes / 30, 6),
+                "Precio_E_Punta": e_punta,
+                "Precio_E_Llano": e_llano,
+                "Precio_E_Valle": e_valle
             }
             
         print("⚠️ No se pudieron extraer valores numéricos completos de Octopus 3.")
