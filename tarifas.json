@@ -20,8 +20,8 @@
       "Comercializadora": "EnergyaVM",
       "Tipo": "Fórmula fija 24h luz",
       "Precio_P_Punta": 0.169,
-      "Precio_P_Valle": 0.0995,
-      "Precio_E_Fijo": 0.0995
+      "Precio_P_Valle": 0.12675,
+      "Precio_E_Fijo": 0.12675
     },
     {
       "Comercializadora": "EnergyaVM",
