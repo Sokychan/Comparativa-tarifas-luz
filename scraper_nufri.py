@@ -41,7 +41,7 @@ def obtener_texto_modal(nombre_tarifa):
                 except:
                     pass
             
-            # Buscar el contenedor específico de la tarjeta deseada
+            # Localizar el contenedor específico de la tarjeta deseada
             tarjeta = page.locator("div, article, section").filter(has_text=nombre_tarifa).filter(has=page.locator("text=Ver precios")).last
             
             if tarjeta.count() > 0:
@@ -55,7 +55,6 @@ def obtener_texto_modal(nombre_tarifa):
             if modales.count() > 0 and modales.first.is_visible():
                 texto_modal = modales.first.inner_text()
             else:
-                # Si no hay modal separado, captura el contenido interno del contenedor de la tarjeta
                 texto_modal = tarjeta.inner_text()
                 
             browser.close()
@@ -77,12 +76,12 @@ def obtener_precios_fijo():
         t_lower = texto.lower()
         
         matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kwh', t_lower)
-        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kw', t_lower)
+        # Exclusión estricta de /kWh usando (?!h)
+        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kw(?!h)', t_lower)
         
         precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.50]
         precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if p != '']
         
-        # Conversión de potencia anual (€/kW año) a diaria (€/kW día)
         potencias_diarias = []
         for p in precios_p_raw:
             if p > 1.5:
@@ -128,7 +127,8 @@ def obtener_precios_3p():
         t_lower = texto.lower()
         
         matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kwh', t_lower)
-        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kw', t_lower)
+        # Exclusión estricta de /kWh usando (?!h)
+        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kw(?!h)', t_lower)
         
         precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
         precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if p != '']
@@ -159,9 +159,9 @@ def obtener_precios_3p():
             return {
                 "Precio_P_Punta": p_punta,
                 "Precio_P_Valle": p_valle,
-                "Precio_E_Punta": e_sort[-1], # El más alto
-                "Precio_E_Llano": e_sort[1],  # El intermedio
-                "Precio_E_Valle": e_sort[0]   # El más bajo
+                "Precio_E_Punta": e_sort[-1],
+                "Precio_E_Llano": e_sort[1],
+                "Precio_E_Valle": e_sort[0]
             }
 
         print("⚠️ No se pudieron aislar los precios de Nufri 3P.")
