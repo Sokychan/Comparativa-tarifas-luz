@@ -11,19 +11,18 @@ st.markdown("Calcula y compara en tiempo real las tarifas actualizadas desde tu 
 if "calculado" not in st.session_state:
     st.session_state.calculado = False
 
-# URL base de tu Google Sheet y GIDs de las pestañas
 SHEET_ID = "1H54QZ3ln7QmHwC5Tf3jF-V4XupIfwZfvSJBJNg3rkTQ"
 
-@st.cache_data(ttl=600) # Caché de 10 minutos para optimizar lecturas
+@st.cache_data(ttl=600)
 def cargar_tarifas_desde_sheets():
-    """Descarga las dos pestañas de Google Sheets directamente como DataFrames"""
+    """Descarga las dos pestañas de Google Sheets adaptándose a los nombres de columna del usuario"""
     try:
-        # Exportar pestaña 1: Tarifas Fijas
+        # Pestaña de Tarifas Fijas
         url_fija = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Tarifa%20Fija"
         res_fija = requests.get(url_fija)
         df_fijas = pd.read_csv(io.StringIO(res_fija.text))
         
-        # Exportar pestaña 2: Tarifas por Periodos
+        # Pestaña de Tarifas por Periodos
         url_periodos = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Tarifa%20Periodos"
         res_periodos = requests.get(url_periodos)
         df_periodos = pd.read_csv(io.StringIO(res_periodos.text))
@@ -32,24 +31,28 @@ def cargar_tarifas_desde_sheets():
         
         # Procesar Fijas
         for _, row in df_fijas.iterrows():
+            if pd.isna(row.get("Comercializadora")): 
+                continue
             tarifas_db.append({
                 "Comercializadora": str(row.get("Comercializadora", "")).strip(),
-                "Tipo": str(row.get("Tipo", "")).strip(),
-                "Precio_P_Punta": float(row.get("Precio_P_Punta", 0)),
-                "Precio_P_Valle": float(row.get("Precio_P_Valle", 0)),
-                "Precio_E_Fijo": float(row.get("Precio_E_Fijo", 0))
+                "Tipo": str(row.get("Nombre de la tarifa", "")).strip(),
+                "Precio_P_Punta": float(row.get("Precio potencia punta", 0)),
+                "Precio_P_Valle": float(row.get("Precio potencia valle", 0)),
+                "Precio_E_Fijo": float(row.get("Precio energía", 0))
             })
             
         # Procesar Periodos
         for _, row in df_periodos.iterrows():
+            if pd.isna(row.get("Comercializadora")): 
+                continue
             tarifas_db.append({
                 "Comercializadora": str(row.get("Comercializadora", "")).strip(),
-                "Tipo": str(row.get("Tipo", "")).strip(),
-                "Precio_P_Punta": float(row.get("Precio_P_Punta", 0)),
-                "Precio_P_Valle": float(row.get("Precio_P_Valle", 0)),
-                "Precio_E_Punta": float(row.get("Precio_E_Punta", 0)),
-                "Precio_E_Llano": float(row.get("Precio_E_Llano", 0)),
-                "Precio_E_Valle": float(row.get("Precio_E_Valle", 0))
+                "Tipo": str(row.get("Nombre de la tarifa", "")).strip(),
+                "Precio_P_Punta": float(row.get("Precio potencia punta", 0)),
+                "Precio_P_Valle": float(row.get("Precio potencia valle", 0)),
+                "Precio_E_Punta": float(row.get("Precio energía punta", 0)),
+                "Precio_E_Llano": float(row.get("Precio energía llano", 0)),
+                "Precio_E_Valle": float(row.get("Precio energía valle", 0))
             })
             
         return tarifas_db
