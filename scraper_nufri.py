@@ -1,8 +1,8 @@
 import re
 from playwright.sync_api import sync_playwright
 
-def obtener_texto_y_numeros(nombre_tarifa):
-    """Abre la web, usa JavaScript para hacer clic en la tarjeta exacta y extrae únicamente el texto del modal."""
+def obtener_texto_modal(nombre_tarifa):
+    """Abre la web, hace clic quirúrgico en la tarjeta usando JS y extrae ÚNICAMENTE el texto del modal."""
     url = "https://www.energianufri.com/es/tarifas-luz"
     try:
         with sync_playwright() as p:
@@ -27,10 +27,10 @@ def obtener_texto_y_numeros(nombre_tarifa):
             page = context.new_page()
             page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
             
-            page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            page.goto(url, wait_until="domcontentloaded", timeout=40000)
             page.wait_for_timeout(3000)
             
-            # Aceptar cookies mediante JS
+            # Aceptar cookies mediante JavaScript
             page.evaluate("""
                 const btns = Array.from(document.querySelectorAll('button, a'));
                 const cookieBtn = btns.find(b => /aceptar|permitir|consentir/i.test(b.innerText));
@@ -38,59 +38,75 @@ def obtener_texto_y_numeros(nombre_tarifa):
             """)
             page.wait_for_timeout(1000)
             
-            # Clic quirúrgico en 'Ver precios' de la tarjeta deseada usando JS
-            page.evaluate(f"""
-                const keyword = '{nombre_tarifa.lower()}';
-                const containers = Array.from(document.querySelectorAll('div, section, article'));
-                
-                const validCards = containers.filter(el => 
-                    el.innerText.toLowerCase().includes(keyword) && 
-                    el.innerText.toLowerCase().includes('ver precios')
+            # Clic exacto en 'Ver precios' de la tarjeta específica
+            js_click = f"""
+            () => {{
+                const tarName = '{nombre_tarifa}';
+                const allElements = Array.from(document.querySelectorAll('*'));
+                // Buscar el texto exacto del título de la tarifa
+                const headings = allElements.filter(el => 
+                    el.children.length === 0 && 
+                    el.textContent.trim().toLowerCase() === tarName.toLowerCase()
                 );
                 
-                if(validCards.length > 0) {{
-                    validCards.sort((a, b) => a.innerText.length - b.innerText.length);
-                    const card = validCards[0];
-                    const btn = Array.from(card.querySelectorAll('button, a')).find(b => b.innerText.toLowerCase().includes('ver precios'));
-                    if(btn) btn.click();
+                if (headings.length > 0) {{
+                    let card = headings[headings.length - 1];
+                    // Subir por el DOM hasta encontrar el contenedor que tenga el botón 'Ver precios'
+                    while(card && card.tagName !== 'BODY') {{
+                        const btns = Array.from(card.querySelectorAll('button, a')).filter(b => b.textContent.toLowerCase().includes('ver precios'));
+                        if (btns.length > 0) {{
+                            btns[0].click();
+                            return true;
+                        }}
+                        card = card.parentElement;
+                    }}
                 }}
-            """)
+                return false;
+            }}
+            """
+            page.evaluate(js_click)
             page.wait_for_timeout(2500)
             
-            # Aislar únicamente el texto dentro del cuadro modal emergente si está abierto
-            texto_modal = page.evaluate("""() => {
-                const modal = document.querySelector("[role='dialog'], [data-state='open'], .sheet-content");
-                if (modal && modal.innerText.length > 20) {
-                    return modal.innerText;
-                }
-                return document.body.innerText;
-            }""")
+            # EXTRAER SOLO EL MODAL: Esto evita capturar los precios gigantes de la página principal
+            texto_modal = page.evaluate("""
+            () => {
+                const dialog = document.querySelector('[role="dialog"], [data-state="open"]');
+                return dialog ? dialog.innerText : '';
+            }
+            """)
             
             browser.close()
-            return ' '.join(texto_modal.split()).lower()
+            # Limpieza de saltos de línea y tabulaciones
+            return ' '.join(texto_modal.split()).lower() if texto_modal else ""
             
     except Exception as e:
         print(f"⚠️ Error al renderizar navegador en Nufri ({nombre_tarifa}): {e}")
         return ""
 
 def extraer_precios_limpios(texto_limpio):
-    """Extrae y clasifica los precios de energía y potencia dentro de rangos estrictos de mercado."""
+    """Extrae y clasifica los precios mediante expresiones regulares estrictas."""
     matches_energia = re.findall(r'(\d+[,\.]\d{2,6})\s*(?:€|eur)?\s*/?\s*k\s*w\s*h', texto_limpio)
+    # Excluye /kWh para capturar solo la potencia
     matches_potencia = re.findall(r'(\d+[,\.]\d{2,6})\s*(?:€|eur)?\s*/?\s*k\s*w(?!\s*h)', texto_limpio)
     
-    # Ajuste de umbral: solo aceptamos energía entre 0.07 €/kWh y 0.50 €/kWh para descartar el 0.03 €
-    precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.07 <= float(p.replace(',', '.')) <= 0.50]
+    # Filtro de seguridad (Energía: 0.08 a 0.40)
+    precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.08 <= float(p.replace(',', '.')) <= 0.40]
     precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if p != '']
     
-    if not precios_p_raw:
+    # Respaldo si falla la extracción por unidades
+    if not precios_e_raw or not precios_p_raw:
         todos_numeros = re.findall(r'(\d+[,\.]\d{2,6})', texto_limpio)
+        candidatos = []
         for n in todos_numeros:
             try:
-                val = float(n.replace(',', '.'))
-                if (0.001 <= val <= 0.15) or (15.0 <= val <= 60.0):
-                    precios_p_raw.append(val)
+                candidatos.append(float(n.replace(',', '.')))
             except:
                 pass
+                
+        if not precios_e_raw:
+            precios_e_raw = [c for c in candidatos if 0.08 <= c <= 0.40]
+        if not precios_p_raw:
+            precios_p_raw = [c for c in candidatos if (0.01 <= c <= 0.15) or (15.0 <= c <= 60.0)]
 
     # Conversión de potencia (anual a diaria si supera los 15€)
     potencias_diarias = []
@@ -107,13 +123,13 @@ def extraer_precios_limpios(texto_limpio):
         if not precios_e_unicos or precios_e_unicos[-1] != p:
             precios_e_unicos.append(p)
             
-    return precios_e_unicos, potencias_diarias
+    return sorted(precios_e_unicos), potencias_diarias
 
 def obtener_precios_fijo():
-    """Extrae los precios de la tarifa 'Universal sin horarios' (Fijo 24h)"""
+    """Extrae los precios de la tarifa 'Universal sin horarios' (Fijo 24h) de Nufri"""
     error_return = {"Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0}
     
-    texto = obtener_texto_y_numeros("Universal sin horarios")
+    texto = obtener_texto_modal("Universal sin horarios")
     if not texto: return error_return
 
     try:
@@ -139,13 +155,13 @@ def obtener_precios_fijo():
         return error_return
 
 def obtener_precios_3p():
-    """Extrae los precios de la tarifa 'Universal con horarios' (3 Periodos)"""
+    """Extrae los precios de la tarifa 'Universal con horarios' (3 Periodos) de Nufri"""
     error_return = {
         "Precio_P_Punta": 0, "Precio_P_Valle": 0, 
         "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0
     }
     
-    texto = obtener_texto_y_numeros("Universal con horarios")
+    texto = obtener_texto_modal("Universal con horarios")
     if not texto: return error_return
 
     try:
@@ -161,14 +177,14 @@ def obtener_precios_3p():
             return {
                 "Precio_P_Punta": p_punta,
                 "Precio_P_Valle": p_valle,
-                "Precio_E_Punta": e_sort[-1], # El más alto
-                "Precio_E_Llano": e_sort[1],  # El intermedio
-                "Precio_E_Valle": e_sort[0]   # El más bajo
+                "Precio_E_Punta": e_sort[-1],
+                "Precio_E_Llano": e_sort[1],
+                "Precio_E_Valle": e_sort[0]
             }
 
         print("⚠️ No se pudieron aislar los precios de Nufri 3P.")
         return error_return
             
     except Exception as e:
-        print(f"⚠️️ Excepción en Nufri 3P: {e}")
+        print(f"⚠️ Excepción en Nufri 3P: {e}")
         return error_return
