@@ -68,8 +68,8 @@ def obtener_precios_fijo():
         
         if precios_e and len(precios_p) >= 2:
             return {
-                "Precio_P_Punta": precios_p[-1], # El más alto es Punta
-                "Precio_P_Valle": precios_p[0],  # El más bajo es Valle
+                "Precio_P_Punta": precios_p[-1],
+                "Precio_P_Valle": precios_p[0],
                 "Precio_E_Fijo": precios_e[0]
             }
 
@@ -77,11 +77,11 @@ def obtener_precios_fijo():
         return error_return
             
     except Exception as e:
-        print(f"⚠️ Excepción en EnergyaVM Fijo: {e}")
+        print(f"⚠️️ Excepción en EnergyaVM Fijo: {e}")
         return error_return
 
 def obtener_precios_3p():
-    """Extrae los precios de la Tarifa 3 Periodos de EnergyaVM"""
+    """Extrae los precios de la Tarifa 3 Periodos de EnergyaVM de forma flexible"""
     url = "https://www.energyavm.es/luz/formula-fija-3-periodos-luz/"
     error_return = {
         "Precio_P_Punta": 0, "Precio_P_Valle": 0, 
@@ -101,7 +101,8 @@ def obtener_precios_3p():
         precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
         precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.50]
         
-        # Eliminar duplicados consecutivos
+        print(f"🔍 [DEBUG] EnergyaVM 3P - Energías detectadas: {precios_e_raw}, Potencias: {precios_p_raw}")
+        
         precios_e_unicos = []
         for p in precios_e_raw:
             if not precios_e_unicos or precios_e_unicos[-1] != p:
@@ -109,15 +110,28 @@ def obtener_precios_3p():
                 
         precios_p = sorted(list(set(precios_p_raw)))
         
+        # Condición estándar
         if len(precios_e_unicos) >= 3 and len(precios_p) >= 2:
             precios_e_ordenados = sorted(precios_e_unicos[:3])
-            
             return {
                 "Precio_P_Punta": precios_p[-1],
                 "Precio_P_Valle": precios_p[0],
                 "Precio_E_Punta": precios_e_ordenados[-1],
                 "Precio_E_Llano": precios_e_ordenados[1],
                 "Precio_E_Valle": precios_e_ordenados[0]
+            }
+        # Condición de emergencia (si encuentra al menos 1 o 2 valores pero la web los estructura distinto)
+        elif len(precios_e_unicos) >= 1 and len(precios_p) >= 1:
+            e_sort = sorted(precios_e_unicos)
+            valle = e_sort[0]
+            punta = e_sort[-1]
+            llano = e_sort[len(e_sort)//2] if len(e_sort) > 1 else valle
+            return {
+                "Precio_P_Punta": precios_p[-1] if precios_p else 0.1,
+                "Precio_P_Valle": precios_p[0] if precios_p else 0.02,
+                "Precio_E_Punta": punta,
+                "Precio_E_Llano": llano,
+                "Precio_E_Valle": valle
             }
 
         print("⚠️ No se pudieron aislar los precios de EnergyaVM 3P.")
