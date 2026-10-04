@@ -2,7 +2,7 @@ import re
 from playwright.sync_api import sync_playwright
 
 def obtener_texto_modal(nombre_tarifa):
-    """Localiza la tarjeta correspondiente, pulsa 'Ver precios' y extrae el texto del modal desplegado."""
+    """Localiza la tarjeta exacta por su título y extrae el texto del modal desplegado."""
     url = "https://www.energianufri.com/es/tarifas-luz"
     try:
         with sync_playwright() as p:
@@ -30,7 +30,7 @@ def obtener_texto_modal(nombre_tarifa):
             page.goto(url, wait_until="domcontentloaded", timeout=40000)
             page.wait_for_timeout(2500)
             
-            # Aceptar cookies de forma automática
+            # Aceptar cookies automáticamente
             for texto_btn in ["Aceptar", "Permitir todas", "Aceptar y continuar", "Consentir"]:
                 try:
                     boton = page.locator(f"button:has-text('{texto_btn}')")
@@ -41,8 +41,8 @@ def obtener_texto_modal(nombre_tarifa):
                 except:
                     pass
             
-            # Localizar el contenedor específico de la tarjeta deseada
-            tarjeta = page.locator("div, article, section").filter(has_text=nombre_tarifa).filter(has=page.locator("text=Ver precios")).last
+            # Anclaje quirúrgico por XPath a la tarjeta individual específica
+            tarjeta = page.locator(f"xpath=//*[contains(text(), '{nombre_tarifa}')]/ancestor::div[contains(., 'Ver precios')][1]")
             
             if tarjeta.count() > 0:
                 btn_ver = tarjeta.locator("text=Ver precios").first
@@ -50,7 +50,7 @@ def obtener_texto_modal(nombre_tarifa):
                     btn_ver.click()
                     page.wait_for_timeout(2000)
             
-            # Aislar el texto del modal / ventana emergente abierta
+            # Aislar el texto del modal desplegado
             modales = page.locator(".modal, [role='dialog'], .popup, .modal-content, div.fixed, div[class*='modal']")
             if modales.count() > 0 and modales.first.is_visible():
                 texto_modal = modales.first.inner_text()
@@ -76,7 +76,6 @@ def obtener_precios_fijo():
         t_lower = texto.lower()
         
         matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kwh', t_lower)
-        # Exclusión estricta de /kWh usando (?!h)
         matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kw(?!h)', t_lower)
         
         precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.50]
@@ -127,7 +126,6 @@ def obtener_precios_3p():
         t_lower = texto.lower()
         
         matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kwh', t_lower)
-        # Exclusión estricta de /kWh usando (?!h)
         matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kw(?!h)', t_lower)
         
         precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
@@ -166,7 +164,7 @@ def obtener_precios_3p():
 
         print("⚠️ No se pudieron aislar los precios de Nufri 3P.")
         return error_return
-        
+            
     except Exception as e:
         print(f"⚠️ Excepción en Nufri 3P: {e}")
         return error_return
