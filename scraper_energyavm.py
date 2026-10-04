@@ -2,7 +2,7 @@ import re
 from playwright.sync_api import sync_playwright
 
 def obtener_texto_visible(url):
-    """Abre la web de EnergyaVM con Playwright y extrae el texto visible."""
+    """Abre la web de EnergyaVM con Playwright y extrae el texto visible puro."""
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(
@@ -27,9 +27,9 @@ def obtener_texto_visible(url):
             page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
             
             page.goto(url, wait_until="networkidle", timeout=40000)
-            page.wait_for_timeout(2500)
+            page.wait_for_timeout(2000)
             
-            # Aceptar cookies automáticamente si aparece el banner
+            # Aceptar cookies automáticamente si aparece el aviso
             for texto_btn in ["Aceptar", "Permitir todas", "Aceptar y continuar", "Consentir"]:
                 try:
                     boton = page.locator(f"button:has-text('{texto_btn}')")
@@ -49,7 +49,7 @@ def obtener_texto_visible(url):
         return None
 
 def obtener_precios_fijo():
-    """Extrae los precios de la tarifa Fórmula Fija 24h de EnergyaVM"""
+    """Extrae los precios de la Tarifa Fija 24h de EnergyaVM"""
     url = "https://www.energyavm.es/luz/formula-fija-24-horas-luz/"
     error_return = {"Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0}
     
@@ -64,12 +64,12 @@ def obtener_precios_fijo():
         matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw', t_lower)
         
         precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.50]
-        precios_p = sorted(list(set([float(p.replace(',', '.')) for p in matches_potencia if 0.001 <= float(p.replace(',', '.')) <= 0.50])))
+        precios_p = sorted(list(set([float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.50])))
         
         if precios_e and len(precios_p) >= 2:
             return {
-                "Precio_P_Punta": precios_p[-1], # El valor más alto es Punta
-                "Precio_P_Valle": precios_p[0],  # El valor más bajo es Valle
+                "Precio_P_Punta": precios_p[-1], # El más alto es Punta
+                "Precio_P_Valle": precios_p[0],  # El más bajo es Valle
                 "Precio_E_Fijo": precios_e[0]
             }
 
@@ -81,7 +81,7 @@ def obtener_precios_fijo():
         return error_return
 
 def obtener_precios_3p():
-    """Extrae los precios de la tarifa Fórmula Fija 3 Periodos de EnergyaVM"""
+    """Extrae los precios de la Tarifa 3 Periodos de EnergyaVM"""
     url = "https://www.energyavm.es/luz/formula-fija-3-periodos-luz/"
     error_return = {
         "Precio_P_Punta": 0, "Precio_P_Valle": 0, 
@@ -99,7 +99,7 @@ def obtener_precios_3p():
         matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw', t_lower)
         
         precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
-        precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if 0.001 <= float(p.replace(',', '.')) <= 0.50]
+        precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.50]
         
         # Eliminar duplicados consecutivos
         precios_e_unicos = []
@@ -115,9 +115,9 @@ def obtener_precios_3p():
             return {
                 "Precio_P_Punta": precios_p[-1],
                 "Precio_P_Valle": precios_p[0],
-                "Precio_E_Punta": precios_e_ordenados[-1], # El más alto
-                "Precio_E_Llano": precios_e_ordenados[1],  # El intermedio
-                "Precio_E_Valle": precios_e_ordenados[0]   # El más bajo
+                "Precio_E_Punta": precios_e_ordenados[-1],
+                "Precio_E_Llano": precios_e_ordenados[1],
+                "Precio_E_Valle": precios_e_ordenados[0]
             }
 
         print("⚠️ No se pudieron aislar los precios de EnergyaVM 3P.")
