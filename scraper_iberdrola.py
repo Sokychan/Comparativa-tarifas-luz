@@ -5,7 +5,7 @@ _html_cache_fijo = None
 _html_cache_3p = None
 
 def obtener_texto_visible(url, es_3p=False):
-    """Extrae el texto visible puro de la página utilizando Playwright para evitar bloqueos WAF."""
+    """Abre la web, acepta cookies automáticamente y extrae el texto visible."""
     global _html_cache_fijo, _html_cache_3p
     if es_3p and _html_cache_3p:
         return _html_cache_3p
@@ -36,7 +36,18 @@ def obtener_texto_visible(url, es_3p=False):
             page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
             
             page.goto(url, wait_until="networkidle", timeout=40000)
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(2000)
+            
+            # Intentar aceptar cookies de forma automática si aparece el banner
+            for texto_btn in ["Aceptar", "Permitir todas", "Aceptar y continuar", "Consentir"]:
+                try:
+                    boton = page.locator(f"button:has-text('{texto_btn}')")
+                    if boton.count() > 0:
+                        boton.first.click(timeout=3000)
+                        page.wait_for_timeout(1500)
+                        break
+                except:
+                    pass
             
             texto = page.evaluate("document.body.innerText")
             browser.close()
@@ -64,7 +75,6 @@ def obtener_precios_fijo():
     try:
         t_lower = texto.lower()
         
-        # Búsqueda flexible de energía y potencias en el texto de Iberdrola Fijo
         matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kwh', t_lower)
         matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw', t_lower)
         
@@ -73,8 +83,8 @@ def obtener_precios_fijo():
         
         if precios_e and len(precios_p) >= 2:
             return {
-                "Precio_P_Punta": precios_p[-1], # El más alto es Punta
-                "Precio_P_Valle": precios_p[0],  # El más bajo es Valle
+                "Precio_P_Punta": precios_p[-1],
+                "Precio_P_Valle": precios_p[0],
                 "Precio_E_Fijo": precios_e[0]
             }
 
@@ -82,7 +92,7 @@ def obtener_precios_fijo():
         return error_return
             
     except Exception as e:
-        print(f"⚠️️ Excepción en Iberdrola Fijo: {e}")
+        print(f"⚠️ Excepción en Iberdrola Fijo: {e}")
         return error_return
 
 def obtener_precios_3p():
@@ -106,7 +116,6 @@ def obtener_precios_3p():
         precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
         precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.50]
         
-        # Eliminar duplicados consecutivos
         precios_e_unicos = []
         for p in precios_e_raw:
             if not precios_e_unicos or precios_e_unicos[-1] != p:
@@ -120,9 +129,9 @@ def obtener_precios_3p():
             return {
                 "Precio_P_Punta": precios_p[-1],
                 "Precio_P_Valle": precios_p[0],
-                "Precio_E_Punta": precios_e_ordenados[-1], # El más alto
-                "Precio_E_Llano": precios_e_ordenados[1],  # El intermedio
-                "Precio_E_Valle": precios_e_ordenados[0]   # El más bajo
+                "Precio_E_Punta": precios_e_ordenados[-1],
+                "Precio_E_Llano": precios_e_ordenados[1],
+                "Precio_E_Valle": precios_e_ordenados[0]
             }
 
         print("⚠️ No se pudieron aislar los precios de Iberdrola 3P.")
