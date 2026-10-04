@@ -1,17 +1,10 @@
+import json
 import re
+from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
-_html_cache_fijo = None
-_html_cache_3p = None
-
-def obtener_texto_visible(url, es_3p=False):
-    """Abre la web, acepta cookies automáticamente y extrae el texto visible."""
-    global _html_cache_fijo, _html_cache_3p
-    if es_3p and _html_cache_3p:
-        return _html_cache_3p
-    if not es_3p and _html_cache_fijo:
-        return _html_cache_fijo
-
+def extraer_datos_agresivos(url):
+    """Método agresivo que extrae y recompone todos los precios válidos de la página."""
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(
@@ -35,108 +28,106 @@ def obtener_texto_visible(url, es_3p=False):
             page = context.new_page()
             page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
             
-            page.goto(url, wait_until="networkidle", timeout=40000)
-            page.wait_for_timeout(2000)
+            page.goto(url, wait_until="networkidle", timeout=45000)
+            page.wait_for_timeout(3000)
             
-            # Intentar aceptar cookies de forma automática si aparece el banner
-            for texto_btn in ["Aceptar", "Permitir todas", "Aceptar y continuar", "Consentir"]:
+            # Auto-aceptar cookies de forma contundente
+            for texto_btn in ["Aceptar", "Permitir todas", "Aceptar y continuar", "Consentir", "Continuar"]:
                 try:
                     boton = page.locator(f"button:has-text('{texto_btn}')")
                     if boton.count() > 0:
-                        boton.first.click(timeout=3000)
-                        page.wait_for_timeout(1500)
+                        boton.first.click(timeout=2000)
+                        page.wait_for_timeout(1000)
                         break
                 except:
                     pass
             
-            texto = page.evaluate("document.body.innerText")
+            html_content = page.content()
             browser.close()
             
-            if es_3p:
-                _html_cache_3p = texto
-            else:
-                _html_cache_fijo = texto
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            # Eliminar scripts y estilos basura
+            for s in soup(["script", "style", "noscript"]):
+                s.extract()
                 
-            return texto
+            # TRUCO CLAVE: separator='' une todo el texto sin espacios, recomponiendo números partidos
+            texto_crudo = soup.get_text(separator='')
+            
+            # Normalizar caracteres y símbolos monetarios
+            texto_limpio = texto_crudo.replace('&euro;', '€').replace('&#8364;', '€').replace('€', ' € ')
+            
+            # Buscar todos los patrones numéricos con decimales seguidos de € o unidades de luz
+            # Captura formatos como 0,1499 o 0.1499
+            matches = re.findall(r'(\d+[,\.]\d+)\s*(?:€|\/kWh|\/kW)', texto_limpio, re.IGNORECASE)
+            
+            if not matches:
+                # Búsqueda libre secundaria si no encuentra etiquetas de moneda exactas
+                matches = re.findall(r'(\d+,\d{2,4})', texto_limpio)
+                
+            # Convertir a float y filtrar rangos lógicos del mercado eléctrico español
+            valores_validos = []
+            for m in matches:
+                try:
+                    val = float(m.replace(',', '.'))
+                    # Rango válido para energía (0.03 a 0.50 €/kWh) y potencia (0.005 a 0.30 €/kW día)
+                    if 0.005 <= val <= 0.60:
+                        if val not in valores_validos:
+                            valores_validos.append(val)
+                except:
+                    pass
+                    
+            return sorted(valores_validos)
             
     except Exception as e:
-        print(f"⚠️ Error al renderizar navegador en Iberdrola ({url}): {e}")
-        return None
+        print(f"⚠️ Error en método agresivo para {url}: {e}")
+        return []
 
 def obtener_precios_fijo():
-    """Extrae los precios del Plan Online (Precio Fijo 24h) de Iberdrola"""
+    """Extrae los precios del Plan Online (Precio Fijo 24h) de Iberdrola de forma agresiva"""
     url = "https://www.iberdrola.es/luz/tarifas/plan-online"
     error_return = {"Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0}
     
-    texto = obtener_texto_visible(url, es_3p=False)
-    if not texto:
-        return error_return
-
-    try:
-        t_lower = texto.lower()
+    precios = extraer_datos_agresivos(url)
+    print(f"🔍 [DEBUG] Precios detectados en Fijo: {precios}")
+    
+    # Filtramos valores lógicos encontrados en la página
+    # Iberdrola fijo suele tener energía sobre 0.10-0.20 y potencia en dos tramos
+    energias = [p for p in precios if 0.08 <= p <= 0.35]
+    potencias = [p for p in precios if 0.005 <= p <= 0.20]
+    
+    if energias and len(potencias) >= 2:
+        return {
+            "Precio_P_Punta": max(potencias),
+            "Precio_P_Valle": min(potencias),
+            "Precio_E_Fijo": energias[0]
+        }
         
-        matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kwh', t_lower)
-        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw', t_lower)
-        
-        precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.50]
-        precios_p = sorted(list(set([float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.50])))
-        
-        if precios_e and len(precios_p) >= 2:
-            return {
-                "Precio_P_Punta": precios_p[-1],
-                "Precio_P_Valle": precios_p[0],
-                "Precio_E_Fijo": precios_e[0]
-            }
-
-        print("⚠️ No se pudieron aislar los precios de Iberdrola Fijo.")
-        return error_return
-            
-    except Exception as e:
-        print(f"⚠️ Excepción en Iberdrola Fijo: {e}")
-        return error_return
+    print("⚠️ No se pudieron consolidar los precios de Iberdrola Fijo.")
+    return error_return
 
 def obtener_precios_3p():
-    """Extrae los precios del Plan Online 3 Periodos de Iberdrola"""
+    """Extrae los precios del Plan Online 3 Periodos de Iberdrola de forma agresiva"""
     url = "https://www.iberdrola.es/luz/tarifas/plan-online-tres-periodos"
     error_return = {
         "Precio_P_Punta": 0, "Precio_P_Valle": 0, 
         "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0
     }
     
-    texto = obtener_texto_visible(url, es_3p=True)
-    if not texto:
-        return error_return
-
-    try:
-        t_lower = texto.lower()
+    precios = extraer_datos_agresivos(url)
+    print(f"🔍 [DEBUG] Precios detectados en 3P: {precios}")
+    
+    energias = sorted([p for p in precios if 0.05 <= p <= 0.45])
+    potencias = [p for p in precios if 0.005 <= p <= 0.20]
+    
+    if len(energias) >= 3 and len(potencias) >= 2:
+        return {
+            "Precio_P_Punta": max(potencias),
+            "Precio_P_Valle": min(potencias),
+            "Precio_E_Punta": energias[-1],
+            "Precio_E_Llano": energias[1] if len(energias) > 1 else energias[0],
+            "Precio_E_Valle": energias[0]
+        }
         
-        matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kwh', t_lower)
-        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw', t_lower)
-        
-        precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
-        precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.50]
-        
-        precios_e_unicos = []
-        for p in precios_e_raw:
-            if not precios_e_unicos or precios_e_unicos[-1] != p:
-                precios_e_unicos.append(p)
-                
-        precios_p = sorted(list(set(precios_p_raw)))
-        
-        if len(precios_e_unicos) >= 3 and len(precios_p) >= 2:
-            precios_e_ordenados = sorted(precios_e_unicos[:3])
-            
-            return {
-                "Precio_P_Punta": precios_p[-1],
-                "Precio_P_Valle": precios_p[0],
-                "Precio_E_Punta": precios_e_ordenados[-1],
-                "Precio_E_Llano": precios_e_ordenados[1],
-                "Precio_E_Valle": precios_e_ordenados[0]
-            }
-
-        print("⚠️ No se pudieron aislar los precios de Iberdrola 3P.")
-        return error_return
-            
-    except Exception as e:
-        print(f"⚠️ Excepción en Iberdrola 3P: {e}")
-        return error_return
+    print("⚠️ No se pudieron consolidar los precios de Iberdrola 3P.")
+    return error_return
