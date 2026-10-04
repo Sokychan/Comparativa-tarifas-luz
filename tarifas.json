@@ -35,18 +35,18 @@
     {
       "Comercializadora": "Visalia",
       "Tipo": "Luz fijo 24h",
-      "Precio_P_Punta": 0.149757,
+      "Precio_P_Punta": 0.076712,
       "Precio_P_Valle": 0.076712,
       "Precio_E_Fijo": 0.149757
     },
     {
       "Comercializadora": "Visalia",
       "Tipo": "Luz 3 Periodos",
-      "Precio_P_Punta": 0.271865,
-      "Precio_P_Valle": 0.075903,
-      "Precio_E_Punta": 0.271865,
-      "Precio_E_Llano": 0.175973,
-      "Precio_E_Valle": 0.147488
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Punta": 0,
+      "Precio_E_Llano": 0,
+      "Precio_E_Valle": 0
     },
     {
       "Comercializadora": "Octopus Energy",
