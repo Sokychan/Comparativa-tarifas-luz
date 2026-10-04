@@ -2,7 +2,7 @@ import re
 from playwright.sync_api import sync_playwright
 
 def obtener_texto_modal(nombre_tarifa):
-    """Localiza la tarjeta exacta por su título y extrae el texto del modal desplegado."""
+    """Localiza la tarjeta exacta, pulsa 'Ver precios' y extrae el texto del modal desplegado sin errores de strict mode."""
     url = "https://www.energianufri.com/es/tarifas-luz"
     try:
         with sync_playwright() as p:
@@ -30,7 +30,7 @@ def obtener_texto_modal(nombre_tarifa):
             page.goto(url, wait_until="domcontentloaded", timeout=40000)
             page.wait_for_timeout(2500)
             
-            # Aceptar cookies automáticamente
+            # Aceptar cookies automáticamente si aparece el aviso
             for texto_btn in ["Aceptar", "Permitir todas", "Aceptar y continuar", "Consentir"]:
                 try:
                     boton = page.locator(f"button:has-text('{texto_btn}')")
@@ -41,8 +41,8 @@ def obtener_texto_modal(nombre_tarifa):
                 except:
                     pass
             
-            # Anclaje quirúrgico por XPath a la tarjeta individual específica
-            tarjeta = page.locator(f"xpath=//*[contains(text(), '{nombre_tarifa}')]/ancestor::div[contains(., 'Ver precios')][1]")
+            # Localizar la tarjeta mediante filtros nativos y aplicar .first para evitar violaciones de modo estricto
+            tarjeta = page.locator("div, article, section").filter(has_text=nombre_tarifa).filter(has=page.locator("text=Ver precios")).first
             
             if tarjeta.count() > 0:
                 btn_ver = tarjeta.locator("text=Ver precios").first
@@ -50,10 +50,10 @@ def obtener_texto_modal(nombre_tarifa):
                     btn_ver.click()
                     page.wait_for_timeout(2000)
             
-            # Aislar el texto del modal desplegado
-            modales = page.locator(".modal, [role='dialog'], .popup, .modal-content, div.fixed, div[class*='modal']")
-            if modales.count() > 0 and modales.first.is_visible():
-                texto_modal = modales.first.inner_text()
+            # Priorizar el cuadro desplegable/dialogo emergente activo
+            dialogo = page.locator("[role='dialog'], [data-state='open'], .modal, .sheet-content").first
+            if dialogo.count() > 0 and dialogo.is_visible():
+                texto_modal = dialogo.inner_text()
             else:
                 texto_modal = tarjeta.inner_text()
                 
