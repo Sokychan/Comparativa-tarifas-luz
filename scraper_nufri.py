@@ -2,7 +2,7 @@ import re
 from playwright.sync_api import sync_playwright
 
 def obtener_texto_modal(nombre_tarifa):
-    """Abre la web, hace clic quirúrgico en la tarjeta usando JS y extrae ÚNICAMENTE el texto del modal."""
+    """Localiza la tarjeta tolerando saltos de línea, pulsa 'Ver precios' y extrae el modal."""
     url = "https://www.energianufri.com/es/tarifas-luz"
     try:
         with sync_playwright() as p:
@@ -27,10 +27,10 @@ def obtener_texto_modal(nombre_tarifa):
             page = context.new_page()
             page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
             
-            page.goto(url, wait_until="domcontentloaded", timeout=40000)
+            page.goto(url, wait_until="domcontentloaded", timeout=45000)
             page.wait_for_timeout(3000)
             
-            # Aceptar cookies mediante JavaScript
+            # Aceptar cookies
             page.evaluate("""
                 const btns = Array.from(document.querySelectorAll('button, a'));
                 const cookieBtn = btns.find(b => /aceptar|permitir|consentir/i.test(b.innerText));
@@ -38,45 +38,35 @@ def obtener_texto_modal(nombre_tarifa):
             """)
             page.wait_for_timeout(1000)
             
-            # Clic exacto en 'Ver precios' de la tarjeta específica
-            js_click = f"""
-            () => {{
-                const tarName = '{nombre_tarifa}';
-                const allElements = Array.from(document.querySelectorAll('*'));
-                // Buscar el texto exacto del título de la tarifa
-                const headings = allElements.filter(el => 
-                    el.children.length === 0 && 
-                    el.textContent.trim().toLowerCase() === tarName.toLowerCase()
-                );
+            # 1. Estrategia Playwright: Reemplazar espacios por .*? para tolerar saltos HTML ocultos
+            regex_tarifa = nombre_tarifa.replace(" ", ".*?")
+            
+            # Buscar el contenedor más profundo (.last) que tenga el nombre y el botón 'Ver precios'
+            tarjetas = page.locator("div, article, section").filter(has_text=re.compile(regex_tarifa, re.IGNORECASE)).filter(has=page.locator("button, a", has_text=re.compile("ver precios", re.IGNORECASE)))
+            
+            if tarjetas.count() > 0:
+                btn = tarjetas.last.locator("button, a").filter(has_text=re.compile("ver precios", re.IGNORECASE)).first
+                btn.click(force=True)
+                page.wait_for_timeout(2500)
                 
-                if (headings.length > 0) {{
-                    let card = headings[headings.length - 1];
-                    // Subir por el DOM hasta encontrar el contenedor que tenga el botón 'Ver precios'
-                    while(card && card.tagName !== 'BODY') {{
-                        const btns = Array.from(card.querySelectorAll('button, a')).filter(b => b.textContent.toLowerCase().includes('ver precios'));
-                        if (btns.length > 0) {{
-                            btns[0].click();
-                            return true;
-                        }}
-                        card = card.parentElement;
-                    }}
-                }}
-                return false;
-            }}
-            """
-            page.evaluate(js_click)
-            page.wait_for_timeout(2500)
+            # Identificar la ventana modal abierta
+            modal = page.locator("[role='dialog'], [data-state='open'], div[id*='radix']").first
             
-            # EXTRAER SOLO EL MODAL: Esto evita capturar los precios gigantes de la página principal
-            texto_modal = page.evaluate("""
-            () => {
-                const dialog = document.querySelector('[role="dialog"], [data-state="open"]');
-                return dialog ? dialog.innerText : '';
-            }
-            """)
+            # 2. Estrategia Respaldo: Si el modal no se abrió, usar índice estático de la cuadrícula
+            if modal.count() == 0 or not modal.is_visible():
+                idx = 4 if "sin horarios" in nombre_tarifa.lower() else 3
+                page.evaluate(f"""
+                    const btns = Array.from(document.querySelectorAll('button, a')).filter(b => b.innerText.toLowerCase().includes('ver precios'));
+                    if(btns.length > {idx}) btns[{idx}].click();
+                """)
+                page.wait_for_timeout(2500)
             
+            if modal.count() > 0 and modal.is_visible():
+                texto_modal = modal.inner_text()
+            else:
+                texto_modal = ""
+                
             browser.close()
-            # Limpieza de saltos de línea y tabulaciones
             return ' '.join(texto_modal.split()).lower() if texto_modal else ""
             
     except Exception as e:
@@ -89,11 +79,11 @@ def extraer_precios_limpios(texto_limpio):
     # Excluye /kWh para capturar solo la potencia
     matches_potencia = re.findall(r'(\d+[,\.]\d{2,6})\s*(?:€|eur)?\s*/?\s*k\s*w(?!\s*h)', texto_limpio)
     
-    # Filtro de seguridad (Energía: 0.08 a 0.40)
+    # Filtro de mercado (Energía: 0.08 a 0.40)
     precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.08 <= float(p.replace(',', '.')) <= 0.40]
     precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if p != '']
     
-    # Respaldo si falla la extracción por unidades
+    # Respaldo de emergencia si no detecta las unidades correctamente
     if not precios_e_raw or not precios_p_raw:
         todos_numeros = re.findall(r'(\d+[,\.]\d{2,6})', texto_limpio)
         candidatos = []
