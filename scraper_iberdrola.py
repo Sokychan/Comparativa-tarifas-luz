@@ -36,7 +36,7 @@ def obtener_texto_visible(url, es_3p=False):
             page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
             
             page.goto(url, wait_until="networkidle", timeout=40000)
-            page.wait_for_timeout(3000) # Espera de seguridad para renderizado completo
+            page.wait_for_timeout(3000)
             
             texto = page.evaluate("document.body.innerText")
             browser.close()
@@ -64,11 +64,12 @@ def obtener_precios_fijo():
     try:
         t_lower = texto.lower()
         
+        # Búsqueda flexible de energía y potencias en el texto de Iberdrola Fijo
         matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kwh', t_lower)
         matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw', t_lower)
         
-        precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.05 <= float(p.replace(',', '.')) <= 0.40]
-        precios_p = sorted(list(set([float(p.replace(',', '.')) for p in matches_potencia if 0.01 <= float(p.replace(',', '.')) <= 0.30])))
+        precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.50]
+        precios_p = sorted(list(set([float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.50])))
         
         if precios_e and len(precios_p) >= 2:
             return {
@@ -81,7 +82,7 @@ def obtener_precios_fijo():
         return error_return
             
     except Exception as e:
-        print(f"⚠️ Excepción en Iberdrola Fijo: {e}")
+        print(f"⚠️️ Excepción en Iberdrola Fijo: {e}")
         return error_return
 
 def obtener_precios_3p():
@@ -103,9 +104,9 @@ def obtener_precios_3p():
         matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw', t_lower)
         
         precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
-        precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if 0.01 <= float(p.replace(',', '.')) <= 0.30]
+        precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.50]
         
-        # Filtrar duplicados consecutivos
+        # Eliminar duplicados consecutivos
         precios_e_unicos = []
         for p in precios_e_raw:
             if not precios_e_unicos or precios_e_unicos[-1] != p:
