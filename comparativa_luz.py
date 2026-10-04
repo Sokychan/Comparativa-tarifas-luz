@@ -1,53 +1,66 @@
 import streamlit as st
 import pandas as pd
-import json
-import os
+import requests
+import io
 import re
 
 st.set_page_config(page_title="Comparador de Tarifas de Luz", page_icon="⚡", layout="wide")
 st.title("⚡ Comparador Inteligente de Tarifas de Luz (España)")
-st.markdown("Calcula y compara de forma automática qué comercializadora se adapta mejor al consumo real.")
+st.markdown("Calcula y compara en tiempo real las tarifas actualizadas desde tu Google Sheets.")
 
 if "calculado" not in st.session_state:
     st.session_state.calculado = False
 
-ARCHIVO_JSON = "tarifas.json"
+# URL base de tu Google Sheet y GIDs de las pestañas
+SHEET_ID = "1H54QZ3ln7QmHwC5Tf3jF-V4XupIfwZfvSJBJNg3rkTQ"
 
-def cargar_tarifas_json(ruta):
-    if os.path.exists(ruta):
-        try:
-            with open(ruta, "r", encoding="utf-8") as f:
-                return json.load(f).get("tarifas", [])
-        except Exception as e:
-            st.error(f"Error al leer el archivo JSON: {e}")
-            return []
-    else:
-        st.warning(f"⚠️ No se ha encontrado `{ruta}`. Usando estructura base.")
-        # Estructura base ampliada
-        return [
-            {"Comercializadora": "Iberdrola", "Tipo": "Plan Online (Precio Fijo)", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0},
-            {"Comercializadora": "Iberdrola", "Tipo": "Plan Online 3 Periodos", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0},
-            {"Comercializadora": "EnergyaVM", "Tipo": "Fórmula fija 24h luz", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0},
-            {"Comercializadora": "EnergyaVM", "Tipo": "Fórmula fija 3 Periodos luz", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0},
-            {"Comercializadora": "Visalia", "Tipo": "Luz fijo 24h", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0},
-            {"Comercializadora": "Visalia", "Tipo": "Luz 3 Periodos", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0},
-            {"Comercializadora": "Octopus Energy", "Tipo": "Octopus Relax", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0},
-            {"Comercializadora": "Octopus Energy", "Tipo": "Octopus 3", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0},
-            {"Comercializadora": "Nufri", "Tipo": "Universal sin horarios", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0},
-            {"Comercializadora": "Nufri", "Tipo": "Universal con horarios", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0},
-            {"Comercializadora": "Imagina energía", "Tipo": "Sin horas", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0},
-            {"Comercializadora": "Imagina energía", "Tipo": "Noche y findes", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0},
-            {"Comercializadora": "CHC Energía", "Tipo": "Plan estrella duo", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0},
-            {"Comercializadora": "Naturgy", "Tipo": "Por Uso Luz", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0},
-            {"Comercializadora": "Naturgy", "Tipo": "Tarifa noche luz", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0},
-            {"Comercializadora": "Endesa", "Tipo": "Conecta Luz", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0},
-            {"Comercializadora": "Endesa", "Tipo": "Conecta 3 Periodos", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0},
-            {"Comercializadora": "Totalenergies", "Tipo": "Luz Siempre", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0},
-            {"Comercializadora": "Totalenergies", "Tipo": "Programa tu Ahorro", "Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0}
-        ]
+@st.cache_data(ttl=600) # Caché de 10 minutos para optimizar lecturas
+def cargar_tarifas_desde_sheets():
+    """Descarga las dos pestañas de Google Sheets directamente como DataFrames"""
+    try:
+        # Exportar pestaña 1: Tarifas Fijas
+        url_fija = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Tarifa%20Fija"
+        res_fija = requests.get(url_fija)
+        df_fijas = pd.read_csv(io.StringIO(res_fija.text))
+        
+        # Exportar pestaña 2: Tarifas por Periodos
+        url_periodos = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Tarifa%20Periodos"
+        res_periodos = requests.get(url_periodos)
+        df_periodos = pd.read_csv(io.StringIO(res_periodos.text))
+        
+        tarifas_db = []
+        
+        # Procesar Fijas
+        for _, row in df_fijas.iterrows():
+            tarifas_db.append({
+                "Comercializadora": str(row.get("Comercializadora", "")).strip(),
+                "Tipo": str(row.get("Tipo", "")).strip(),
+                "Precio_P_Punta": float(row.get("Precio_P_Punta", 0)),
+                "Precio_P_Valle": float(row.get("Precio_P_Valle", 0)),
+                "Precio_E_Fijo": float(row.get("Precio_E_Fijo", 0))
+            })
+            
+        # Procesar Periodos
+        for _, row in df_periodos.iterrows():
+            tarifas_db.append({
+                "Comercializadora": str(row.get("Comercializadora", "")).strip(),
+                "Tipo": str(row.get("Tipo", "")).strip(),
+                "Precio_P_Punta": float(row.get("Precio_P_Punta", 0)),
+                "Precio_P_Valle": float(row.get("Precio_P_Valle", 0)),
+                "Precio_E_Punta": float(row.get("Precio_E_Punta", 0)),
+                "Precio_E_Llano": float(row.get("Precio_E_Llano", 0)),
+                "Precio_E_Valle": float(row.get("Precio_E_Valle", 0))
+            })
+            
+        return tarifas_db
+    except Exception as e:
+        st.error(f"Error al conectar con Google Sheets: {e}")
+        return []
 
-tarifas_db = cargar_tarifas_json(ARCHIVO_JSON)
-if not tarifas_db: st.stop()
+tarifas_db = cargar_tarifas_desde_sheets()
+if not tarifas_db: 
+    st.warning("⚠️ No se han podido cargar las tarifas desde Google Sheets. Comprueba que las pestañas se llamen 'Tarifa Fija' y 'Tarifa Periodos'.")
+    st.stop()
 
 max_decimales = 2
 for t in tarifas_db:
@@ -151,7 +164,7 @@ if st.session_state.calculado:
             tiene_error = (p_punta == 0 or p_valle == 0 or e_punta == 0 or e_llano == 0 or e_valle == 0)
             
         if tiene_error:
-            st.warning(f"⚠️ **Error de actualización**: La tarifa **{t.get('Comercializadora')} ({t.get('Tipo')})** tiene precios a 0.")
+            st.warning(f"⚠️ **Error de datos**: La tarifa **{t.get('Comercializadora')} ({t.get('Tipo')})** tiene precios a 0.")
             continue
         
         coste_potencia = potencia * (p_punta + p_valle) * dias
