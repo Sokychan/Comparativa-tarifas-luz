@@ -42,11 +42,11 @@
     {
       "Comercializadora": "Visalia",
       "Tipo": "Luz 3 Periodos",
-      "Precio_P_Punta": 0,
-      "Precio_P_Valle": 0,
-      "Precio_E_Punta": 0,
-      "Precio_E_Llano": 0,
-      "Precio_E_Valle": 0
+      "Precio_P_Punta": 0.075903,
+      "Precio_P_Valle": 0.001987,
+      "Precio_E_Punta": 0.271865,
+      "Precio_E_Llano": 0.175973,
+      "Precio_E_Valle": 0.147488
     },
     {
       "Comercializadora": "Octopus Energy",
