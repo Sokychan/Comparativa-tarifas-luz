@@ -1,8 +1,8 @@
 import re
 from playwright.sync_api import sync_playwright
 
-def obtener_texto_resumen(url):
-    """Abre la web de EnergyaVM y extrae el texto del panel de resumen de tarifa."""
+def obtener_texto_pagina(url):
+    """Abre la web de EnergyaVM y extrae el texto visible puro."""
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(
@@ -40,7 +40,6 @@ def obtener_texto_resumen(url):
                 except:
                     pass
             
-            # Extraer el texto completo de la página
             texto = page.evaluate("document.body.innerText")
             browser.close()
             return texto
@@ -50,93 +49,81 @@ def obtener_texto_resumen(url):
         return None
 
 def obtener_precios_fijo():
-    """Extrae los precios de la Tarifa Fija 24h de EnergyaVM"""
+    """Extrae con precisión los precios de la Tarifa Fija 24h de EnergyaVM"""
     url = "https://www.energyavm.es/luz/formula-fija-24-horas-luz/"
     error_return = {"Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0}
     
-    texto = obtener_texto_resumen(url)
+    texto = obtener_texto_pagina(url)
     if not texto:
         return error_return
 
     try:
         t_lower = texto.lower()
         
-        matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kwh', t_lower)
-        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kw', t_lower)
+        # Anclaje estricto a P1 y P2 del término de potencia (anuales -> conversión a diarios /365)
+        p1_m = re.search(r'p1[^\d]*(\d+[\.,]\d+)', t_lower)
+        p2_m = re.search(r'p2[^\d]*(\d+[\.,]\d+)', t_lower)
         
-        precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.50]
-        precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if p != '']
+        # Anclaje estricto al término de energía fijo
+        e_m = re.search(r'término de energía[^\d]*(\d+[\.,]\d+)', t_lower)
         
-        # Conversión de potencia anual (€/kW año) a diaria (€/kW día) si supera 1.0
-        potencias_diarias = []
-        for p in precios_p_raw:
-            if p > 1.0:
-                potencias_diarias.append(round(p / 365.0, 6))
-            elif 0.001 <= p <= 0.5:
-                potencias_diarias.append(p)
-                
-        potencias_diarias = sorted(list(set(potencias_diarias)))
-        
-        if precios_e and len(potencias_diarias) >= 2:
+        if p1_m and p2_m and e_m:
+            p1 = float(p1_m.group(1).replace(',', '.')) / 365.0
+            p2 = float(p2_m.group(1).replace(',', '.')) / 365.0
+            ef = float(e_m.group(1).replace(',', '.'))
+            
             return {
-                "Precio_P_Punta": potencias_diarias[-1],
-                "Precio_P_Valle": potencias_diarias[0],
-                "Precio_E_Fijo": precios_e[0]
+                "Precio_P_Punta": round(p1, 6),
+                "Precio_P_Valle": round(p2, 6),
+                "Precio_E_Fijo": ef
             }
 
         print("⚠️ No se pudieron aislar los precios de EnergyaVM Fijo.")
         return error_return
             
     except Exception as e:
-        print(f"⚠️️ Excepción en EnergyaVM Fijo: {e}")
+        print(f"⚠️ Excepción en EnergyaVM Fijo: {e}")
         return error_return
 
 def obtener_precios_3p():
-    """Extrae los precios de la Tarifa 3 Periodos de EnergyaVM"""
+    """Extrae con precisión los precios de la Tarifa 3 Periodos de EnergyaVM"""
     url = "https://www.energyavm.es/luz/formula-fija-3-periodos-luz/"
     error_return = {
         "Precio_P_Punta": 0, "Precio_P_Valle": 0, 
         "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0
     }
     
-    texto = obtener_texto_resumen(url)
+    texto = obtener_texto_pagina(url)
     if not texto:
         return error_return
 
     try:
         t_lower = texto.lower()
         
-        matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kwh', t_lower)
-        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kw', t_lower)
+        # Potencias P1 y P2
+        p1_m = re.search(r'p1[^\d]*(\d+[\.,]\d+)', t_lower)
+        p2_m = re.search(r'p2[^\d]*(\d+[\.,]\d+)', t_lower)
         
-        precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
-        precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if p != '']
+        # Aislar la sección de energía para capturar P1, P2 y P3 específicos
+        idx_e = t_lower.find("término de energía")
+        seccion_energia = t_lower[idx_e:] if idx_e != -1 else t_lower
         
-        # Conversión de potencia anual a diaria
-        potencias_diarias = []
-        for p in precios_p_raw:
-            if p > 1.0:
-                potencias_diarias.append(round(p / 365.0, 6))
-            elif 0.001 <= p <= 0.5:
-                potencias_diarias.append(p)
-                
-        potencias_diarias = sorted(list(set(potencias_diarias)))
+        e_valores = re.findall(r'p([123])[^\d]*(\d+[\.,]\d+)', seccion_energia)
         
-        # Filtrar duplicados consecutivos en energía
-        precios_e_unicos = []
-        for p in precios_e_raw:
-            if not precios_e_unicos or precios_e_unicos[-1] != p:
-                precios_e_unicos.append(p)
-                
-        if len(precios_e_unicos) >= 3 and len(potencias_diarias) >= 2:
-            precios_e_ordenados = sorted(precios_e_unicos[:3])
+        energias = {}
+        for p, val in e_valores:
+            energias[int(p)] = float(val.replace(',', '.'))
+            
+        if p1_m and p2_m and len(energias) >= 3:
+            p1 = float(p1_m.group(1).replace(',', '.')) / 365.0
+            p2 = float(p2_m.group(1).replace(',', '.')) / 365.0
             
             return {
-                "Precio_P_Punta": potencias_diarias[-1],
-                "Precio_P_Valle": potencias_diarias[0],
-                "Precio_E_Punta": precios_e_ordenados[-1],
-                "Precio_E_Llano": precios_e_ordenados[1],
-                "Precio_E_Valle": precios_e_ordenados[0]
+                "Precio_P_Punta": round(p1, 6),
+                "Precio_P_Valle": round(p2, 6),
+                "Precio_E_Punta": energias.get(1, 0),
+                "Precio_E_Llano": energias.get(2, 0),
+                "Precio_E_Valle": energias.get(3, 0)
             }
 
         print("⚠️ No se pudieron aislar los precios de EnergyaVM 3P.")
