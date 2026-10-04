@@ -30,7 +30,7 @@ def obtener_texto_visible(url):
             page.wait_for_timeout(2500)
             
             # Aceptar cookies automáticamente si aparece el aviso
-            for texto_btn in ["Aceptar", "Permitir todas", "Aceptar y continuar", "Consentir", "Configurar"]:
+            for texto_btn in ["Aceptar", "Permitir todas", "Aceptar y continuar", "Consentir"]:
                 try:
                     boton = page.locator(f"button:has-text('{texto_btn}')")
                     if boton.count() > 0:
@@ -60,29 +60,22 @@ def obtener_precios_fijo():
     try:
         t_lower = texto.lower()
         
-        matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kwh', t_lower)
-        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kw', t_lower)
-        
+        matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kwh', t_lower)
+        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw\s*d[ií]a', t_lower)
+        if not matches_potencia:
+            matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw', t_lower)
+            
         precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.50]
-        precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if p != '']
+        precios_p = [float(p.replace(',', '.')) for p in matches_potencia if 0.0001 <= float(p.replace(',', '.')) <= 0.50]
         
-        # Normalización de potencia (si viene en mensual o anual, se pasa a diario)
-        potencias_diarias = []
-        for p in precios_p_raw:
-            if p > 1.5:
-                if p > 15.0:
-                    potencias_diarias.append(round(p / 365.0, 6))
-                else:
-                    potencias_diarias.append(round(p / 30.0, 6))
-            elif 0.001 <= p <= 0.5:
-                potencias_diarias.append(p)
-                
-        potencias_diarias = sorted(list(set(potencias_diarias)))
-        
-        if precios_e and len(potencias_diarias) >= 2:
+        if precios_e and precios_p:
+            p_valor = precios_p[0]
+            p_punta = max(precios_p) if len(precios_p) > 1 else p_valor
+            p_valle = min(precios_p) if len(precios_p) > 1 else p_valor
+            
             return {
-                "Precio_P_Punta": potencias_diarias[-1],
-                "Precio_P_Valle": potencias_diarias[0],
+                "Precio_P_Punta": p_punta,
+                "Precio_P_Valle": p_valle,
                 "Precio_E_Fijo": precios_e[0]
             }
 
@@ -108,38 +101,39 @@ def obtener_precios_3p():
     try:
         t_lower = texto.lower()
         
-        matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kwh', t_lower)
-        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kw', t_lower)
+        # Extraer usando las etiquetas explícitas que muestra Visalia en las tarjetas
+        match_e_valle = re.search(r'valle[^\d]*(\d+[,\.]\d+)\s*€\s*/\s*kwh', t_lower)
+        match_e_llano = re.search(r'llano[^\d]*(\d+[,\.]\d+)\s*€\s*/\s*kwh', t_lower)
+        match_e_punta = re.search(r'punta[^\d]*(\d+[,\.]\d+)\s*€\s*/\s*kwh', t_lower)
         
-        precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
-        precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if p != '']
+        match_p_valle = re.search(r'valle[^\d]*(\d+[,\.]\d+)\s*€\s*/\s*kw\s*d[ií]a', t_lower)
+        match_p_punta = re.search(r'punta[^\d]*(\d+[,\.]\d+)\s*€\s*/\s*kw\s*d[ií]a', t_lower)
         
-        potencias_diarias = []
-        for p in precios_p_raw:
-            if p > 1.5:
-                if p > 15.0:
-                    potencias_diarias.append(round(p / 365.0, 6))
-                else:
-                    potencias_diarias.append(round(p / 30.0, 6))
-            elif 0.001 <= p <= 0.5:
-                potencias_diarias.append(p)
-                
-        potencias_diarias = sorted(list(set(potencias_diarias)))
-        
-        precios_e_unicos = []
-        for p in precios_e_raw:
-            if not precios_e_unicos or precios_e_unicos[-1] != p:
-                precios_e_unicos.append(p)
-                
-        if len(precios_e_unicos) >= 3 and len(potencias_diarias) >= 2:
-            precios_e_ordenados = sorted(precios_e_unicos[:3])
-            
+        if match_e_valle and match_e_llano and match_e_punta and match_p_valle and match_p_punta:
             return {
-                "Precio_P_Punta": potencias_diarias[-1],
-                "Precio_P_Valle": potencias_diarias[0],
-                "Precio_E_Punta": precios_e_ordenados[-1],
-                "Precio_E_Llano": precios_e_ordenados[1],
-                "Precio_E_Valle": precios_e_ordenados[0]
+                "Precio_P_Punta": float(match_p_punta.group(1).replace(',', '.')),
+                "Precio_P_Valle": float(match_p_valle.group(1).replace(',', '.')),
+                "Precio_E_Punta": float(match_e_punta.group(1).replace(',', '.')),
+                "Precio_E_Llano": float(match_e_llano.group(1).replace(',', '.')),
+                "Precio_E_Valle": float(match_e_valle.group(1).replace(',', '.'))
+            }
+            
+        # Respaldo por listas secuenciales
+        matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kwh', t_lower)
+        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw', t_lower)
+        
+        precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
+        precios_p = [float(p.replace(',', '.')) for p in matches_potencia if 0.0001 <= float(p.replace(',', '.')) <= 0.50]
+        
+        if len(precios_e) >= 3 and len(precios_p) >= 2:
+            e_sort = sorted(precios_e)
+            p_sort = sorted(precios_p)
+            return {
+                "Precio_P_Punta": p_sort[-1],
+                "Precio_P_Valle": p_sort[0],
+                "Precio_E_Punta": e_sort[-1],
+                "Precio_E_Llano": e_sort[len(e_sort)//2],
+                "Precio_E_Valle": e_sort[0]
             }
 
         print("⚠️ No se pudieron aislar los precios de Visalia 3P.")
