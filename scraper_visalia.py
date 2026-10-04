@@ -26,8 +26,9 @@ def obtener_texto_visible(url):
             page = context.new_page()
             page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
             
-            page.goto(url, wait_until="networkidle", timeout=40000)
-            page.wait_for_timeout(2500)
+            # Cambiado a domcontentloaded para evitar bloqueos por scripts de fondo en networkidle
+            page.goto(url, wait_until="domcontentloaded", timeout=40000)
+            page.wait_for_timeout(3000)
             
             # Aceptar cookies automáticamente si aparece el aviso
             for texto_btn in ["Aceptar", "Permitir todas", "Aceptar y continuar", "Consentir"]:
