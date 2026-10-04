@@ -1,9 +1,8 @@
-
 import re
 from playwright.sync_api import sync_playwright
 
-def obtener_texto_desplegado(nombre_tarifa):
-    """Abre la web de Nufri, acepta cookies, hace clic en 'Ver precios' de la tarjeta deseada y extrae el texto."""
+def obtener_texto_modal(nombre_tarifa):
+    """Localiza la tarjeta correspondiente, pulsa 'Ver precios' y extrae el texto del modal desplegado."""
     url = "https://www.energianufri.com/es/tarifas-luz"
     try:
         with sync_playwright() as p:
@@ -31,28 +30,36 @@ def obtener_texto_desplegado(nombre_tarifa):
             page.goto(url, wait_until="domcontentloaded", timeout=40000)
             page.wait_for_timeout(2500)
             
-            # Aceptar cookies automáticamente
+            # Aceptar cookies de forma automática
             for texto_btn in ["Aceptar", "Permitir todas", "Aceptar y continuar", "Consentir"]:
                 try:
                     boton = page.locator(f"button:has-text('{texto_btn}')")
                     if boton.count() > 0:
-                        boton.first.click(timeout=2000)
+                        boton.first.click(timeout=1500)
                         page.wait_for_timeout(1000)
                         break
                 except:
                     pass
             
-            # Filtrar la tarjeta específica que contiene la tarifa y el botón 'Ver precios'
-            tarjeta = page.locator("*").filter(has_text=nombre_tarifa).filter(has=page.locator("text=Ver precios")).last
-            btn_ver = tarjeta.locator("text=Ver precios").first
+            # Buscar el contenedor específico de la tarjeta deseada
+            tarjeta = page.locator("div, article, section").filter(has_text=nombre_tarifa).filter(has=page.locator("text=Ver precios")).last
             
-            if btn_ver.count() > 0:
-                btn_ver.click()
-                page.wait_for_timeout(2000)
+            if tarjeta.count() > 0:
+                btn_ver = tarjeta.locator("text=Ver precios").first
+                if btn_ver.count() > 0:
+                    btn_ver.click()
+                    page.wait_for_timeout(2000)
             
-            texto = page.evaluate("document.body.innerText")
+            # Aislar el texto del modal / ventana emergente abierta
+            modales = page.locator(".modal, [role='dialog'], .popup, .modal-content, div.fixed, div[class*='modal']")
+            if modales.count() > 0 and modales.first.is_visible():
+                texto_modal = modales.first.inner_text()
+            else:
+                # Si no hay modal separado, captura el contenido interno del contenedor de la tarjeta
+                texto_modal = tarjeta.inner_text()
+                
             browser.close()
-            return texto
+            return texto_modal
             
     except Exception as e:
         print(f"⚠️ Error al renderizar navegador en Nufri ({nombre_tarifa}): {e}")
@@ -62,7 +69,7 @@ def obtener_precios_fijo():
     """Extrae los precios de la tarifa 'Universal sin horarios' (Fijo 24h) de Nufri"""
     error_return = {"Precio_P_Punta": 0, "Precio_P_Valle": 0, "Precio_E_Fijo": 0}
     
-    texto = obtener_texto_desplegado("Universal sin horarios")
+    texto = obtener_texto_modal("Universal sin horarios")
     if not texto:
         return error_return
 
@@ -75,7 +82,7 @@ def obtener_precios_fijo():
         precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.50]
         precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if p != '']
         
-        # Normalización de potencia (si viniese en anual o mensual, la convierte a diaria)
+        # Conversión de potencia anual (€/kW año) a diaria (€/kW día)
         potencias_diarias = []
         for p in precios_p_raw:
             if p > 1.5:
@@ -113,7 +120,7 @@ def obtener_precios_3p():
         "Precio_E_Punta": 0, "Precio_E_Llano": 0, "Precio_E_Valle": 0
     }
     
-    texto = obtener_texto_desplegado("Universal con horarios")
+    texto = obtener_texto_modal("Universal con horarios")
     if not texto:
         return error_return
 
@@ -152,9 +159,9 @@ def obtener_precios_3p():
             return {
                 "Precio_P_Punta": p_punta,
                 "Precio_P_Valle": p_valle,
-                "Precio_E_Punta": e_sort[-1],
-                "Precio_E_Llano": e_sort[1],
-                "Precio_E_Valle": e_sort[0]
+                "Precio_E_Punta": e_sort[-1], # El más alto
+                "Precio_E_Llano": e_sort[1],  # El intermedio
+                "Precio_E_Valle": e_sort[0]   # El más bajo
             }
 
         print("⚠️ No se pudieron aislar los precios de Nufri 3P.")
