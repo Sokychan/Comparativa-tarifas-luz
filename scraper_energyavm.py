@@ -27,7 +27,7 @@ def obtener_texto_visible(url):
             page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
             
             page.goto(url, wait_until="networkidle", timeout=40000)
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(2500)
             
             # Aceptar cookies automáticamente si aparece el aviso
             for texto_btn in ["Aceptar", "Permitir todas", "Aceptar y continuar", "Consentir"]:
@@ -60,11 +60,11 @@ def obtener_precios_fijo():
     try:
         t_lower = texto.lower()
         
-        matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kwh', t_lower)
-        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw', t_lower)
+        matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kwh', t_lower)
+        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€?\s*/\s*kw', t_lower)
         
         precios_e = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.50]
-        precios_p = sorted(list(set([float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.50])))
+        precios_p = sorted(list(set([float(p.replace(',', '.')) for p in matches_potencia if 0.001 <= float(p.replace(',', '.')) <= 0.50])))
         
         if precios_e and len(precios_p) >= 2:
             return {
@@ -77,11 +77,11 @@ def obtener_precios_fijo():
         return error_return
             
     except Exception as e:
-        print(f"⚠️️ Excepción en EnergyaVM Fijo: {e}")
+        print(f"⚠️ Excepción en EnergyaVM Fijo: {e}")
         return error_return
 
 def obtener_precios_3p():
-    """Extrae los precios de la Tarifa 3 Periodos de EnergyaVM de forma flexible"""
+    """Extrae los precios de la Tarifa 3 Periodos de EnergyaVM mediante filtrado inteligente"""
     url = "https://www.energyavm.es/luz/formula-fija-3-periodos-luz/"
     error_return = {
         "Precio_P_Punta": 0, "Precio_P_Valle": 0, 
@@ -95,40 +95,45 @@ def obtener_precios_3p():
     try:
         t_lower = texto.lower()
         
-        matches_energia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kwh', t_lower)
-        matches_potencia = re.findall(r'(\d+[,\.]\d+)\s*€\s*/\s*kw', t_lower)
+        # Capturar todos los números con decimales de la página de 3 periodos
+        todos_numeros = re.findall(r'(\d+[\.,]\d{2,4})', t_lower)
         
-        precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.03 <= float(p.replace(',', '.')) <= 0.60]
-        precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if 0.005 <= float(p.replace(',', '.')) <= 0.50]
-        
-        print(f"🔍 [DEBUG] EnergyaVM 3P - Energías detectadas: {precios_e_raw}, Potencias: {precios_p_raw}")
-        
-        precios_e_unicos = []
-        for p in precios_e_raw:
-            if not precios_e_unicos or precios_e_unicos[-1] != p:
-                precios_e_unicos.append(p)
+        candidatos = []
+        for n in todos_numeros:
+            try:
+                val = float(n.replace(',', '.'))
+                if 0.005 <= val <= 0.60:
+                    if val not in candidatos:
+                        candidatos.append(val)
+            except:
+                pass
                 
-        precios_p = sorted(list(set(precios_p_raw)))
+        print(f"🔍 [DEBUG] EnergyaVM 3P - Candidatos numéricos detectados: {candidatos}")
         
-        # Condición estándar
-        if len(precios_e_unicos) >= 3 and len(precios_p) >= 2:
-            precios_e_ordenados = sorted(precios_e_unicos[:3])
+        # Clasificación por rangos eléctricos de mercado:
+        # Potencia (kW día): habitualmente entre 0.005 y 0.15 €
+        # Energía (kWh): habitualmente entre 0.08 y 0.55 €
+        potencias = sorted([c for c in candidatos if 0.001 <= c <= 0.15])
+        energias = sorted([c for c in candidatos if 0.08 <= c <= 0.55])
+        
+        print(f"🔍 [DEBUG] EnergyaVM 3P - Potencias filtradas: {potencias}, Energías filtradas: {energias}")
+        
+        if len(energias) >= 3 and len(potencias) >= 2:
             return {
-                "Precio_P_Punta": precios_p[-1],
-                "Precio_P_Valle": precios_p[0],
-                "Precio_E_Punta": precios_e_ordenados[-1],
-                "Precio_E_Llano": precios_e_ordenados[1],
-                "Precio_E_Valle": precios_e_ordenados[0]
+                "Precio_P_Punta": potencias[-1],
+                "Precio_P_Valle": potencias[0],
+                "Precio_E_Punta": energias[-1],
+                "Precio_E_Llano": energias[len(energias)//2],
+                "Precio_E_Valle": energias[0]
             }
-        # Condición de emergencia (si encuentra al menos 1 o 2 valores pero la web los estructura distinto)
-        elif len(precios_e_unicos) >= 1 and len(precios_p) >= 1:
-            e_sort = sorted(precios_e_unicos)
-            valle = e_sort[0]
-            punta = e_sort[-1]
-            llano = e_sort[len(e_sort)//2] if len(e_sort) > 1 else valle
+        elif len(energias) >= 1 and len(potencias) >= 1:
+            # Respaldo flexible en caso de capturar menos elementos únicos de los previstos
+            valle = energias[0]
+            punta = energias[-1]
+            llano = energias[len(energias)//2] if len(energias) > 1 else valle
             return {
-                "Precio_P_Punta": precios_p[-1] if precios_p else 0.1,
-                "Precio_P_Valle": precios_p[0] if precios_p else 0.02,
+                "Precio_P_Punta": potencias[-1],
+                "Precio_P_Valle": potencias[0],
                 "Precio_E_Punta": punta,
                 "Precio_E_Llano": llano,
                 "Precio_E_Valle": valle
