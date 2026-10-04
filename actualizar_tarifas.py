@@ -60,7 +60,13 @@ def actualizar_fichero_tarifas():
             continue
 
         # 5. Determinar si es precio fijo o 3 periodos por el nombre en el JSON
-        es_3p = any(keyword in tipo.lower() for keyword in ["3 periodos", "noche", "horarios", "ahorro", "octopus 3"])
+        tipo_lower = tipo.lower()
+        if any(keyword in tipo_lower for keyword in ["sin horarios", "24h", "24 horas", "24 h", "relax", "fijo", "fija"]):
+            es_3p = False
+        elif any(keyword in tipo_lower for keyword in ["3 periodos", "3p", "con horarios", "noche", "horarios", "ahorro", "octopus 3"]):
+            es_3p = True
+        else:
+            es_3p = False
         
         nuevos_valores = None
         try:
@@ -86,6 +92,14 @@ def actualizar_fichero_tarifas():
             else:
                 print(f"   ✔ Extraído correctamente.")
             
+            # Saneamiento de llaves según la modalidad capturada
+            if es_3p:
+                tarifa.pop("Precio_E_Fijo", None)
+            else:
+                tarifa.pop("Precio_E_Punta", None)
+                tarifa.pop("Precio_E_Llano", None)
+                tarifa.pop("Precio_E_Valle", None)
+
             # Sobrescribir los datos en el diccionario de la tarifa
             for clave, valor in nuevos_valores.items():
                 tarifa[clave] = valor
