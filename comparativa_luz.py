@@ -20,7 +20,6 @@ def limpiar_float(valor):
     if isinstance(valor, (int, float)):
         return float(valor)
     val_str = str(valor).strip()
-    # Reemplazar coma decimal por punto
     val_str = val_str.replace(',', '.')
     try:
         return float(val_str)
@@ -79,12 +78,14 @@ if not tarifas_db:
     st.warning("⚠️ No se han podido cargar las tarifas desde Google Sheets. Comprueba que las pestañas se llamen 'Tarifa Fija' y 'Tarifa Periodos'.")
     st.stop()
 
+# Detección automática dinámica del número máximo de decimales presentes en los datos
 max_decimales = 2
 for t in tarifas_db:
     for k in ["Precio_P_Punta", "Precio_P_Valle", "Precio_E_Punta", "Precio_E_Llano", "Precio_E_Valle", "Precio_E_Fijo"]:
-        if k in t and isinstance(t[k], (int, float)):
-            partes = str(t[k]).split(".")
-            if len(partes) > 1: max_decimales = max(max_decimales, len(partes[1]))
+        if k in t and isinstance(t[k], (int, float)) and t[k] != 0:
+            partes = f"{t[k]:.10f}".rstrip('0').split(".")
+            if len(partes) > 1:
+                max_decimales = max(max_decimales, len(partes[1]))
 
 def formatear_precio(val):
     if val is None or val == 0: return "⚠️ Error (0 €)" if val == 0 else "-"
