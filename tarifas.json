@@ -67,12 +67,9 @@
     {
       "Comercializadora": "Nufri",
       "Tipo": "Universal sin horarios",
-      "Precio_P_Punta": 0.210915,
-      "Precio_P_Valle": 0.029385,
-      "Precio_E_Fijo": 0,
-      "Precio_E_Punta": 0.169,
-      "Precio_E_Llano": 0.108,
-      "Precio_E_Valle": 0.063
+      "Precio_P_Punta": 0,
+      "Precio_P_Valle": 0,
+      "Precio_E_Fijo": 0
     },
     {
       "Comercializadora": "Nufri",
