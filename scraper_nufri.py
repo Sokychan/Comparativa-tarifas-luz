@@ -2,7 +2,7 @@ import re
 from playwright.sync_api import sync_playwright
 
 def obtener_texto_modal(nombre_tarifa):
-    """Localiza la tarjeta tolerando saltos de línea, pulsa 'Ver precios' y extrae el modal."""
+    """Inyecta JavaScript directo para saltarse los bloqueos de interfaz, forzar el clic y extraer el modal."""
     url = "https://www.energianufri.com/es/tarifas-luz"
     try:
         with sync_playwright() as p:
@@ -27,10 +27,10 @@ def obtener_texto_modal(nombre_tarifa):
             page = context.new_page()
             page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
             
-            page.goto(url, wait_until="domcontentloaded", timeout=45000)
-            page.wait_for_timeout(3000)
+            # networkidle asegura que todos los elementos interactivos hayan cargado en segundo plano
+            page.goto(url, wait_until="networkidle", timeout=45000)
             
-            # Aceptar cookies
+            # 1. Aceptar cookies agresivamente con JS
             page.evaluate("""
                 const btns = Array.from(document.querySelectorAll('button, a'));
                 const cookieBtn = btns.find(b => /aceptar|permitir|consentir/i.test(b.innerText));
@@ -38,34 +38,58 @@ def obtener_texto_modal(nombre_tarifa):
             """)
             page.wait_for_timeout(1000)
             
-            # 1. Estrategia Playwright: Reemplazar espacios por .*? para tolerar saltos HTML ocultos
-            regex_tarifa = nombre_tarifa.replace(" ", ".*?")
-            
-            # Buscar el contenedor más profundo (.last) que tenga el nombre y el botón 'Ver precios'
-            tarjetas = page.locator("div, article, section").filter(has_text=re.compile(regex_tarifa, re.IGNORECASE)).filter(has=page.locator("button, a", has_text=re.compile("ver precios", re.IGNORECASE)))
-            
-            if tarjetas.count() > 0:
-                btn = tarjetas.last.locator("button, a").filter(has_text=re.compile("ver precios", re.IGNORECASE)).first
-                btn.click(force=True)
-                page.wait_for_timeout(2500)
+            # 2. Navegación DOM directa mediante JS para forzar el clic en el botón correcto
+            js_click = f"""
+            () => {{
+                let clicked = false;
+                const tarName = '{nombre_tarifa}'.toLowerCase();
                 
-            # Identificar la ventana modal abierta
-            modal = page.locator("[role='dialog'], [data-state='open'], div[id*='radix']").first
-            
-            # 2. Estrategia Respaldo: Si el modal no se abrió, usar índice estático de la cuadrícula
-            if modal.count() == 0 or not modal.is_visible():
-                idx = 4 if "sin horarios" in nombre_tarifa.lower() else 3
-                page.evaluate(f"""
-                    const btns = Array.from(document.querySelectorAll('button, a')).filter(b => b.innerText.toLowerCase().includes('ver precios'));
-                    if(btns.length > {idx}) btns[{idx}].click();
-                """)
-                page.wait_for_timeout(2500)
-            
-            if modal.count() > 0 and modal.is_visible():
-                texto_modal = modal.inner_text()
-            else:
-                texto_modal = ""
+                // Buscar el texto exacto en cualquier elemento de texto puro
+                const texts = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, p, span, div')).filter(el => 
+                    el.children.length === 0 && el.textContent.toLowerCase().trim() === tarName
+                );
                 
+                // Escalar hacia el padre hasta encontrar el botón de 'Ver precios'
+                for (let el of texts) {{
+                    let parent = el.parentElement;
+                    while (parent && parent.tagName !== 'BODY') {{
+                        const btns = Array.from(parent.querySelectorAll('button, a')).filter(b => /ver precios/i.test(b.textContent));
+                        if (btns.length > 0) {{
+                            btns[0].click();
+                            clicked = true;
+                            break;
+                        }}
+                        parent = parent.parentElement;
+                    }}
+                    if (clicked) break;
+                }}
+                
+                // Respaldo de emergencia: si el texto cambió, clicamos por orden de aparición
+                if (!clicked) {{
+                    const allBtns = Array.from(document.querySelectorAll('button, a')).filter(b => /ver precios/i.test(b.textContent));
+                    const idx = tarName.includes('sin horarios') ? 4 : 3;
+                    if (allBtns.length > idx) {{
+                        allBtns[idx].click();
+                    }}
+                }}
+            }}
+            """
+            page.evaluate(js_click)
+            
+            # Damos 3 segundos completos para que la ventana emergente aparezca y cargue los datos
+            page.wait_for_timeout(3000)
+            
+            # 3. Extraer estrictamente el modal
+            texto_modal = page.evaluate("""
+            () => {
+                const modal = document.querySelector('[role="dialog"], [data-state="open"], div.fixed.z-50');
+                if (modal && modal.innerText && modal.innerText.trim().length > 10) {
+                    return modal.innerText;
+                }
+                return document.body.innerText; 
+            }
+            """)
+            
             browser.close()
             return ' '.join(texto_modal.split()).lower() if texto_modal else ""
             
@@ -76,14 +100,13 @@ def obtener_texto_modal(nombre_tarifa):
 def extraer_precios_limpios(texto_limpio):
     """Extrae y clasifica los precios mediante expresiones regulares estrictas."""
     matches_energia = re.findall(r'(\d+[,\.]\d{2,6})\s*(?:€|eur)?\s*/?\s*k\s*w\s*h', texto_limpio)
-    # Excluye /kWh para capturar solo la potencia
     matches_potencia = re.findall(r'(\d+[,\.]\d{2,6})\s*(?:€|eur)?\s*/?\s*k\s*w(?!\s*h)', texto_limpio)
     
-    # Filtro de mercado (Energía: 0.08 a 0.40)
+    # Rango de mercado para energía: 0.08 a 0.40 €/kWh
     precios_e_raw = [float(p.replace(',', '.')) for p in matches_energia if 0.08 <= float(p.replace(',', '.')) <= 0.40]
     precios_p_raw = [float(p.replace(',', '.')) for p in matches_potencia if p != '']
     
-    # Respaldo de emergencia si no detecta las unidades correctamente
+    # Respaldo si no detecta las unidades correctamente
     if not precios_e_raw or not precios_p_raw:
         todos_numeros = re.findall(r'(\d+[,\.]\d{2,6})', texto_limpio)
         candidatos = []
@@ -124,7 +147,7 @@ def obtener_precios_fijo():
 
     try:
         precios_e, potencias_p = extraer_precios_limpios(texto)
-        print(f"🔍 [DEBUG] Nufri Fijo - Energías: {precios_e}, Potencias: {potencias_p}")
+        print(f"🔍 [DEBUG] Nufri Fijo - Energías extraídas: {precios_e}, Potencias extraídas: {potencias_p}")
         
         if precios_e and potencias_p:
             p_val = potencias_p[0]
@@ -156,7 +179,7 @@ def obtener_precios_3p():
 
     try:
         precios_e, potencias_p = extraer_precios_limpios(texto)
-        print(f"🔍 [DEBUG] Nufri 3P - Energías: {precios_e}, Potencias: {potencias_p}")
+        print(f"🔍 [DEBUG] Nufri 3P - Energías extraídas: {precios_e}, Potencias extraídas: {potencias_p}")
         
         if len(precios_e) >= 3 and potencias_p:
             e_sort = sorted(precios_e[:3])
@@ -172,7 +195,7 @@ def obtener_precios_3p():
                 "Precio_E_Valle": e_sort[0]
             }
 
-        print("⚠️ No se pudieron aislar los precios de Nufri 3P.")
+        print("⚠️️ No se pudieron aislar los precios de Nufri 3P.")
         return error_return
             
     except Exception as e:
